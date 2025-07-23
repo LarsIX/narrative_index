@@ -1,0 +1,50 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "AI_narrative_index"
+version = "0.0.1"
+description = "This project constructs an AI Narrative Index by fine-tuning BERT on manually annotated Wall Street Journal articles from 2023 and 2024. The index is combined with complementary financial and sentiment data to examine its predictive power for stock market prices using LSTM models, with interpretability assessed through explainable AI (XAI) techniques."
+authors = [
+  { name = "Lars Augustat" },
+]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+
+# Dependencies needed to run the project (add more as needed)
+dependencies = [
+  "pandas",
+  "numpy",
+  "scikit-learn",
+  "matplotlib",
+  "seaborn",
+  "torch",
+  "transformers",
+  "tqdm",
+  "datasets",
+  "scipy"
+]
+
+[project.optional-dependencies]
+dev = [
+  "jupyter",
+  "black",
+  "ruff",
+  "pytest",
+  "ipykernel",
+  "python-dotenv"
+]
+
+[tool.ruff]
+line-length = 99
+src = ["AI_narrative_index"]
+include = ["pyproject.toml", "AI_narrative_index/**/*.py"]
+
+[tool.ruff.lint]
+extend-select = ["I"]  # Add import sorting
+
+[tool.ruff.lint.isort]
+known-first-party = ["AI_narrative_index"]
+force-sort-within-sections = true
