@@ -1,3 +1,64 @@
+ 🧠 AI Narrative Index (AINI)
+
+This repository contains the full research pipeline for constructing the **AI Narrative Index (AINI)** — a time-series measure of how artificial intelligence is represented and emotionally framed in financial news. The index is derived from **Wall Street Journal (WSJ)** articles from **2023 to 2025**, and used to assess causal impacts on asset returns, investor sentiment, and volatility.
+
+The project integrates **Transformer-based NLP**, **manual annotation**, **deep learning fine-tuning**, and **econometric and information-theoretic causal inference** — all within a modular, reproducible, and industry-ready architecture.
+
+---
+
+## 🎯 Research Objectives
+
+- **Develop multiple variants of an AI Narrative Index (AINI)** using both **supervised fine-tuning** and **zero-shot inference**.
+
+- **Evaluate the temporal and causal effects** of narrative hype on market dynamics using Granger causality and transfer entropy.
+
+- **Ensure scientific rigor** through pre-annotation protocols, dual-labeller verification, and formal statistical diagnostics.
+
+---
+
+## 🧩 Construction of the AINI Index
+
+This project explores **two distinct and complementary approaches** to quantifyin
+
+### 1. AINI via Manual Annotation and FinBERT Fine-Tuning
+
+- A manually annotated dataset (2023–2024) was created in collaboration with a **professional second annotator**, focusing on:
+  - **AI Relevance** (binary classification)  
+  - **Narrative Hype Level** (sentiment-style score)
+
+- A custom **FinBERT model** is trained on this dataset, using:
+  - Class-weighted loss  
+  - Window-based context extraction  
+  - Early stopping and evaluation logging
+
+- The result is a **binary AI index** used as a base for further analysis.
+
+---
+
+### 2. AINI via Standard FinBERT and Snippet Reduction
+
+- The pretrained **FinBERT model** ([ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is applied to **pre-cleaned WSJ articles**.
+
+- Articles are first **reduced using preprocessing and dimensionality reduction techniques**, including:
+  - Heuristic snippet extraction around AI keywords  
+  - BERT-based contextual windowing
+
+- The resulting **probabilistic sentiment outputs** are aggregated into a daily AINI time series.
+
+---
+
+### 3. AINI via ChatGPT Labeling and Prompt Engineering *(modules under construction, uploaded soon)*
+
+- WSJ articles are labeled for **AI relevance** using **GPT-4 via the OpenAI API**, using few-shot prompting with *Chain-of-Thought* reasoning.
+
+- Only articles classified as **AI-related** are then passed to the **pretrained FinBERT model** to predict their **sentiment** (positive, neutral, negative).
+
+- As in Method 2, the resulting sentiment scores are aggregated into a daily AINI time series—this time restricted to **GPT-identified AI narratives**.
+
+- Ongoing evaluation focuses on:
+  - Agreement between GPT labels and human annotations  
+  - Stability across prompt designs and reasoning chains  
+  - Effectiveness of GPT labeling as a **scalable weak supervision** approach
 
 ## 📐 Statistical Testing & Causal Inference
 
