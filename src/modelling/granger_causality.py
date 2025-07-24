@@ -8,7 +8,6 @@ using bootstrapping and heteroskedasticity diagnostics. It supports:
 - Breusch-Pagan and White tests for residual heteroskedasticity
 - flexible directionality: AINI → returns or returns → AINI
 
-Author: [Your Name]
 """
 
 import numpy as np
@@ -140,7 +139,9 @@ def estimate_bootstraped_gc(
                                 "AIC": aic,
                                 "BIC": bic,
                                 "N_boot": len(boot_f_pvals),
+                                "bp_stat" : bp_stat,
                                 "BP_pval": bp_pval,
+                                "white_stat" : white_stat,
                                 "White_pval": white_pval,
                                 "BP_reject": bp_pval < 0.05,
                                 "White_reject": white_pval < 0.05,

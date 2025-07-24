@@ -72,11 +72,14 @@ Used to validate input variables before time series modeling.
 
 ### 🔁 Granger Causality (GC)
 
-- Bootstrap-based F-tests
-- False discovery rate (FDR) control (Benjamini-Hochberg)
-- Heteroskedasticity-consistent diagnostics
+Tests predictive causality between AINI and log returns or volatility indices using:
 
-Estimates predictive causality between AINI and log returns or volatility indices.
+- **SUR-based panel regressions** (Seemingly Unrelated Regressions)
+- **Country-specific Wald tests** with **bootstrap critical values**
+- **Advanced bootstrapping**: resampling residuals from null-restricted models, preserving temporal and cross-sectional dependence
+- **Benjamini-Hochberg FDR correction** across lags
+
+Supports both directions: `AINI ➝ returns` and `returns ➝ AINI`.
 
 ### 🔄 Transfer Entropy (TE)
 
