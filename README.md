@@ -1,4 +1,4 @@
- 🧠 AI Narrative Index (AINI)
+# 🧠 AI Narrative Index (AINI)
 
 This repository contains the full research pipeline for constructing the **AI Narrative Index (AINI)** — a time-series measure of how artificial intelligence is represented and emotionally framed in financial news. The index is derived from **Wall Street Journal (WSJ)** articles from **2023 to 2025** and used as an independent variable to estimate asset returns.
 
