@@ -2,7 +2,7 @@
 
 This repository contains the full research pipeline for constructing the **AI Narrative Index (AINI)** — a time-series measure of how artificial intelligence is represented and emotionally framed in financial news. The index is derived from **Wall Street Journal (WSJ)** articles from **2023 to 2025** and used as an independent variable to estimate asset returns.
 
-The project integrates **Transformer-based NLP**, **manual annotation**, **deep learning fine-tuning**, and **econometric and information-theoretic causal inference** — all within a modular, reproducible, and industry-ready architecture.
+The project integrates **Transformer-based NLP**, **manual annotation**, **deep learning fine-tuning**, and **econometric and information-theoretic inference** — all within a modular and reproducible architecture.
 
 ---
 
@@ -10,7 +10,7 @@ The project integrates **Transformer-based NLP**, **manual annotation**, **deep 
 
 - **Develop multiple variants of an AI Narrative Index (AINI)** using both **supervised fine-tuning** and **zero-shot inference**.
 
-- **Evaluate the temporal and causal effects** of narrative hype on market dynamics using Granger causality and transfer entropy.
+- **Evaluate the temporal effects** of narrative hype on market dynamics using Granger Causality and Transfer Entropy.
 
 - **Ensure scientific rigor** through pre-annotation protocols, dual-labeller verification, and formal statistical diagnostics.
 
@@ -18,26 +18,25 @@ The project integrates **Transformer-based NLP**, **manual annotation**, **deep 
 
 ## 🧩 Construction of the AINI Index
 
-This project explores **two distinct and complementary approaches** to quantifyin
+To quantify the AI Narrative Index (AINI), this project implements **three complementary methods** — combining human annotation, Transformer models, and prompt-based weak supervision.
 
 ### 1. AINI via Manual Annotation and FinBERT Fine-Tuning
 
 - A manually annotated dataset (2023–2024) was created in collaboration with a **professional second annotator**, focusing on:
   - **AI Relevance** (binary classification)  
-  - **Narrative Hype Level** (sentiment-style score)
 
-- A custom **FinBERT model** is trained on this dataset, using:
+- A custom **FinBERT model** is fine-tuned on this dataset, using:
   - Class-weighted loss  
   - Window-based context extraction  
   - Early stopping and evaluation logging
 
-- The result is a **binary AI index** used as a base for further analysis.
+- The resulting predictions form a **binary AI Narrative Index**, capturing the **topic salience** of AI-related narratives — i.e., how prominently AI is discussed in financial news coverage.
 
 ---
 
 ### 2. AINI via Standard FinBERT and Snippet Reduction
 
-- The pretrained **FinBERT model** ([ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is applied to **pre-cleaned WSJ articles**.
+- The pretrained **FinBERT model** ([ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is applied to **pre-cleaned WSJ articles** without additional training.
 
 - Articles are first **reduced using preprocessing and dimensionality reduction techniques**, including:
   - Heuristic snippet extraction around AI keywords  
@@ -49,16 +48,16 @@ This project explores **two distinct and complementary approaches** to quantifyi
 
 ### 3. AINI via ChatGPT Labeling and Prompt Engineering *(modules under construction, uploaded soon)*
 
-- WSJ articles are labeled for **AI relevance** using **GPT-4 via the OpenAI API**, using few-shot prompting with *Chain-of-Thought* reasoning.
+- WSJ articles are labeled for **AI relevance** using **GPT-4 via the OpenAI API**, with few-shot prompting and *Chain-of-Thought* reasoning.
 
-- Only articles classified as **AI-related** are then passed to the **pretrained FinBERT model** to predict their **sentiment** (positive, neutral, negative).
+- Only articles classified as **AI-related** are passed to the **pretrained FinBERT model** to predict their **sentiment**.
 
-- As in Method 2, the resulting sentiment scores are aggregated into a daily AINI time series—this time restricted to **GPT-identified AI narratives**.
+- As in Method 2, sentiment scores are aggregated into a daily AINI time series — but here restricted to **GPT-identified AI narratives**.
 
 - Ongoing evaluation focuses on:
   - Agreement between GPT labels and human annotations  
   - Stability across prompt designs and reasoning chains  
-  - Effectiveness of GPT labeling as a **scalable weak supervision** approach
+  - Effectiveness of GPT labeling as a **scalable weak supervision** method
 
 ## 📐 Statistical Testing & Causal Inference
 
