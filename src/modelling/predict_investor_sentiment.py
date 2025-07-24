@@ -106,7 +106,7 @@ def predict_sentiment(year: int, batch_size: int = 4):
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_path, index=False)
 
-    typer.echo(f"✅ Saved sentiment predictions to {output_path}")
+    typer.echo(f"Saved sentiment predictions to {output_path}")
 
     return {
         "output_path": output_path,

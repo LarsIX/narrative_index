@@ -28,11 +28,11 @@ def run(
     """
     Create a new WSJ article database.
     """
-    typer.echo("🚀 Creating Database...")
+    typer.echo("Creating Database...")
 
     results = create_database.create_db(year=year, folder=folder)
 
-    typer.echo(f"📦 New database for {results['year']} created at: {results['output_path']}")
+    typer.echo(f"New database for {results['year']} created at: {results['output_path']}")
 
 # CLI entry point
 if __name__ == "__main__":

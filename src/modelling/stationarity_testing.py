@@ -95,12 +95,12 @@ def test_stationarity_aini_variants(aini_data, variants=None, window = None):
                 })
 
             except Exception as e:
-                print(f"⚠️ Stationarity test failed for {variant} ({period}): {e}")
+                print(f"Stationarity test failed for {variant} ({period}): {e}")
 
     # Save final results
     df_results = pd.DataFrame(results)
     df_results.to_csv(output_file, index=False)
-    print(f"✅ Stationarity test results saved to: {output_file}")
+    print(f"Stationarity test results saved to: {output_file}")
 
     # return df for further analysis
     return df_results
@@ -170,9 +170,9 @@ def test_stationarity_fin_variables(fin_data, fin_var=None):
                     })
 
                 except Exception as e:
-                    print(f"⚠️ Stationarity test failed for {ticker} / {variable} ({period}): {e}")
+                    print(f"Stationarity test failed for {ticker} / {variable} ({period}): {e}")
 
     df_results = pd.DataFrame(results)
     df_results.to_csv(output_file, index=False)
-    print(f"✅ Stationarity test results saved to: {output_file}")
+    print(f"Stationarity test results saved to: {output_file}")
     return df_results

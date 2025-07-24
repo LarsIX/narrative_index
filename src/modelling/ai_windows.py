@@ -393,7 +393,7 @@ def extract_human_readable_snippet(
         return snippet.strip()
 
     # Apply row-wise with tqdm
-    tqdm.pandas(desc="⚙️ Extracting AI keyword context windows")
+    tqdm.pandas(desc="Extracting AI keyword context windows")
     df[output_col] = df.progress_apply(
         lambda row: extract(row[title_col], row[text_col]),
         axis=1

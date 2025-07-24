@@ -36,7 +36,7 @@ def filter_article_by_section(df: pd.DataFrame, df_index: pd.DataFrame) -> pd.Da
     df = df[~df["section"].isin(irrelevant_sections)].copy()
 
     # Log some verification details
-    print("✅ Finished merge and filter")
+    print("Finished merge and filter")
     print("Remaining articles:", len(df))
     print("Unique sections:", sorted(set(df['section'].dropna())))
     print("Missing dates:", df['date'].isna().sum())
@@ -80,7 +80,7 @@ def filter_article_for_sentiment(df: pd.DataFrame, df_index: pd.DataFrame) -> pd
     df = df[df["section"].isin(relevant_sections)].copy()
 
     # Log some verification details
-    print("✅ Finished merge and filter")
+    print("Finished merge and filter")
     print("Remaining articles:", len(df))
     print("Unique sections:", sorted(set(df['section'].dropna())))
     print("Missing dates:", df['date'].isna().sum())

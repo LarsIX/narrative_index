@@ -155,10 +155,10 @@ def estimate_bootstraped_gc(
                             results.append(result)
 
                         except Exception as e:
-                            print(f"❌ Lag {lag} failed for {ticker} ({var}, {year}): {e}")
+                            print(f"Lag {lag} failed for {ticker} ({var}, {year}): {e}")
 
                 except Exception as e:
-                    print(f"❌ Ticker {ticker} failed for ({var}, {year}): {e}")
+                    print(f"Ticker {ticker} failed for ({var}, {year}): {e}")
 
     gc_df = pd.DataFrame(results)
 
@@ -170,13 +170,13 @@ def estimate_bootstraped_gc(
             group["BH_reject_F"] = reject
             group["BH_corr_F"] = pvals_corr
         except Exception as e:
-            print(f"⚠️ BH correction failed for {ticker}, {year}: {e}")
+            print(f"BH correction failed for {ticker}, {year}: {e}")
             group["BH_reject_F"] = False
             group["BH_corr_F"] = np.nan
         corrected.append(group)
 
     gc_df = pd.concat(corrected, ignore_index=True)
     gc_df.to_csv(output_path, index=False)
-    print(f"✅ Bootstrapped Granger results saved to: {output_path}")
+    print(f"Bootstrapped Granger results saved to: {output_path}")
 
     return gc_df

@@ -27,7 +27,7 @@ def run(
     context_window: int = typer.Option(1, help="Number of surrounding sentences to include (default: 1)"),
     max_tokens: int = typer.Option(512, help="Max token length (<= 512 for BERT)")
 ):
-    typer.echo(f"🚀 FinBERT starting")
+    typer.echo(f"FinBERT starting")
 
     result = predict_sentiment(
         year=year,
@@ -36,8 +36,8 @@ def run(
         max_tokens=max_tokens
     )
     
-    typer.echo(f"✅ Prediction successful. Results saved to: {result['output_path']}")
-    typer.echo(f"📦 Used device: {result['device']}")
+    typer.echo(f"Prediction successful. Results saved to: {result['output_path']}")
+    typer.echo(f"Used device: {result['device']}")
 
 # Run the app
 if __name__ == "__main__":

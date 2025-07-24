@@ -18,12 +18,12 @@ def run_bert(
     """
     Run FinBERT-based inference to label WSJ articles for AI-related narrative presence.
     """
-    typer.echo("🚀 Script started")
+    typer.echo("Script started")
 
     result = label_data(year=year, batch_size=batch_size)
 
-    typer.echo(f"✅ Predictions saved to: {result['output_path']}")
-    typer.echo(f"🔢 Total articles labeled: {result['n_labeled_articles']}")
+    typer.echo(f"Predictions saved to: {result['output_path']}")
+    typer.echo(f"Total articles labeled: {result['n_labeled_articles']}")
 
 if __name__ == "__main__":
     app()

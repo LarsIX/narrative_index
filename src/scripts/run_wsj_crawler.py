@@ -20,7 +20,7 @@ def run(
     Crawl WSJ article metadata for a given year and store it in a yearly SQLite database.
     """
     db_path = os.path.join("data", "raw", "articles", f"articlesWSJ_{year}.db")
-    typer.echo(f"📅 Starting crawl for {year} with {wait}s delay — DB: {db_path}")
+    typer.echo(f"Starting crawl for {year} with {wait}s delay — DB: {db_path}")
     search_year(year=year, wait=wait, db_path=db_path)
 
 if __name__ == "__main__":

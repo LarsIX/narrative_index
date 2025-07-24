@@ -25,13 +25,13 @@ def scrape(
     """
     Scrape WSJ article content by date or in batch from a local database.
     """
-    typer.echo(f"🔍 Starting WSJ scraping with limit={limit} and date={year}-{month}-{day}")
+    typer.echo(f"Starting WSJ scraping with limit={limit} and date={year}-{month}-{day}")
     
     scraper = WSJScraper(str(db_path))
     articles = scraper.get_article_links(limit=limit, year=year, month=month, day=day)
 
     if not articles:
-        typer.echo("⚠️ No unscreened articles found for the given filters.")
+        typer.echo("No unscreened articles found for the given filters.")
         scraper.close()
         raise typer.Exit(code=0)
 
@@ -39,7 +39,7 @@ def scrape(
         scraper.scrape_article(article_id, url)
 
     scraper.close()
-    typer.echo("✅ Finished scraping WSJ articles.")
+    typer.echo("Finished scraping WSJ articles.")
 
 if __name__ == "__main__":
     app()

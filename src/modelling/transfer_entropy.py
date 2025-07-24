@@ -102,10 +102,10 @@ def estimate_te(
     # Automatically detect AINI variables if none provided
     if aini_vars is None:
         aini_vars = [col for col in aini_data.columns if fnmatch(col, "*AINI*")]
-    print(f"🧠 Detected AINI variants: {aini_vars}")
+    print(f"Detected AINI variants: {aini_vars}")
 
     for aini_var in aini_vars:
-        print(f"\n➡️ Estimating TE for AINI variable: {aini_var}")
+        print(f"\n Estimating TE for AINI variable: {aini_var}")
 
         ticker_arrays = get_ticker_for_TE(
             fin_data=fin_data,
@@ -114,7 +114,7 @@ def estimate_te(
         )
 
         for k_val in k_list:
-            print(f"\n🔍 Running TE estimation with k = {k_val}")
+            print(f"\n Running TE estimation with k = {k_val}")
 
             results_list = []
 
@@ -127,7 +127,7 @@ def estimate_te(
                 array_cleaned = array[:, first_valid_index:]
 
                 if np.isnan(array_cleaned).any():
-                    print(f"❌ {ticker}: skipped – residual NaNs")
+                    print(f"{ticker}: skipped – residual NaNs")
                     continue
 
                 try:
@@ -172,7 +172,7 @@ def estimate_te(
                     })
 
                 except Exception as e:
-                    print(f"❌ {ticker}: TE analysis failed → {e}")
+                    print(f"{ticker}: TE analysis failed → {e}")
 
             df_k = pd.DataFrame(results_list)
             all_results.append(df_k)
@@ -180,13 +180,13 @@ def estimate_te(
             if save:
                 filename = f"{aini_var}_to_{target_name}_te_k{k_val}_{year}.csv"
                 df_k.to_csv(var_path / filename, index=False)
-                print(f"📁 Saved results for k={k_val} to {filename}")
+                print(f"Saved results for k={k_val} to {filename}")
 
     df_all = pd.concat(all_results, ignore_index=True)
 
     if save:
         combined_name = f"te_benchmark_{year}_window{window}.csv" if window else f"te_benchmark_{year}.csv"
         df_all.to_csv(var_path / combined_name, index=False)
-        print(f"\n✅ Combined TE results saved to {combined_name}")
+        print(f"\n Combined TE results saved to {combined_name}")
 
     return df_all

@@ -26,11 +26,11 @@ def run(
 
     Uses GPU if available.
     """  
-    typer.echo("🚀 Starting sentiment prediction...")
+    typer.echo("Starting sentiment prediction...")
 
     result = predict_sentiment(year, batch_size)
-    typer.echo(f"🖥️ Used device: {result['device']}")
-    typer.echo(f"✅ Saved sentiment predictions to: {result['output_path']}")
+    typer.echo(f"Used device: {result['device']}")
+    typer.echo(f"Saved sentiment predictions to: {result['output_path']}")
 
 if __name__ == "__main__":
     app()

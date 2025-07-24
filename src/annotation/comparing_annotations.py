@@ -65,7 +65,7 @@ def resolve_label_disagreements_AI(df_author, df_annotator):
 
     # Filter for label mismatches
     disagreements = merged[merged['label_ai_related_author'] != merged['label_ai_related_annotator']]
-    print(f"🔍 Number of disagreements: {disagreements.shape[0]}")
+    print(f"Number of disagreements: {disagreements.shape[0]}")
 
     # Iterate and prompt for corrections
     for i, (_, row) in enumerate(disagreements.iterrows()):
@@ -87,14 +87,14 @@ def resolve_label_disagreements_AI(df_author, df_annotator):
 """
         display(Markdown(md_text))
 
-        change_label = input("🔄 Change label (default=annotator) ? (y/n): ").strip().lower()
+        change_label = input("Change label (default=annotator) ? (y/n): ").strip().lower()
         if change_label == 'y':
             new_label = 0 if row['label_ai_related_annotator'] == 1 else 1
             df_ai_level_merge.loc[df_ai_level_merge['article_id'] == row['article_id'], 'label_ai_related'] = new_label
             df_ai_level_merge.loc[df_ai_level_merge['article_id'] == row['article_id'], 'modified'] = 1
-            print(f"✅ Label changed to: {new_label}")
+            print(f"Label changed to: {new_label}")
         else:
-            print("❌ Label not changed")
+            print("Label not changed")
 
     return df_ai_level_merge
 
@@ -166,7 +166,7 @@ def resolve_hype_disagreements(df_author, df_ai_level_mergen):
     """
         display(Markdown(md_text))
 
-        change = input("🔄 Change hype level (default=annotator)? (y/n): ").strip().lower()
+        change = input("Change hype level (default=annotator)? (y/n): ").strip().lower()
         if change == 'y':
             while True:
                 try:
@@ -175,12 +175,12 @@ def resolve_hype_disagreements(df_author, df_ai_level_mergen):
                         raise ValueError
                     break
                 except ValueError:
-                    print("❗ Invalid input. Please enter 0, 1, or 2.")
+                    print("Invalid input. Please enter 0, 1, or 2.")
 
             df_final.loc[df_final['article_id'] == row['article_id'], 'hype_level'] = new_value
             df_final.loc[df_final['article_id'] == row['article_id'], 'hype_level_change'] = 1
-            print(f"✅ Hype level updated to: {new_value}")
+            print(f"Hype level updated to: {new_value}")
         else:
-            print("❌ Hype level not changed")
+            print("Hype level not changed")
 
     return df_final

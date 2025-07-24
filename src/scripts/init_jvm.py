@@ -20,7 +20,7 @@ from pathlib import Path
 
 def start_jvm():
     if jpype.isJVMStarted():
-        print("⚠️ JVM already running.")
+        print("JVM already running.")
         return
 
     # Resolve path to infodynamics.jar (JIDT library)
@@ -32,10 +32,10 @@ def start_jvm():
 
     # Validate paths
     if not jar_path.exists():
-        raise FileNotFoundError(f"❌ infodynamics.jar not found at: {jar_path}")
+        raise FileNotFoundError(f"infodynamics.jar not found at: {jar_path}")
     if not jvm_path.exists():
-        raise FileNotFoundError(f"❌ jvm.dll not found at: {jvm_path}")
+        raise FileNotFoundError(f"jvm.dll not found at: {jvm_path}")
 
     # Start JVM with JIDT classpath
     jpype.startJVM(str(jvm_path), "-ea", f"-Djava.class.path={str(jar_path)}")
-    print(f"✅ JVM started with infodynamics.jar at: {jar_path}")
+    print(f"JVM started with infodynamics.jar at: {jar_path}")

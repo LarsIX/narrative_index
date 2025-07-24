@@ -32,7 +32,7 @@ def run(
 
     file_name, saved_path = fetch_and_save_data(start_date=start_date, end_date=end_date, save_dir=save_dir)
 
-    typer.echo(f"✅ Saved merged financial data as: {saved_path / file_name}")
+    typer.echo(f"Saved merged financial data as: {saved_path / file_name}")
 
 if __name__ == "__main__":
     app()

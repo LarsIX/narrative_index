@@ -40,7 +40,7 @@ def build_df(df_1, df_2, df_3=None, df_4=None, cutoff_min=None, cutoff_max=None,
         if "date" in df.columns:
             df["date"] = pd.to_datetime(df["date"])
         else:
-            typer.echo(f"❌ DataFrame is missing 'date' column:\n{df.head()}")
+            typer.echo(f"DataFrame is missing 'date' column:\n{df.head()}")
             return None
 
     cutoff_min = dt.datetime(2023, 3, 31) if cutoff_min is None else cutoff_min
@@ -67,12 +67,12 @@ def build_df(df_1, df_2, df_3=None, df_4=None, cutoff_min=None, cutoff_max=None,
     final_df["normalized_AINI_growth"] = final_df["normalized_AINI"].diff()
     final_df = final_df.reset_index()
 
-    typer.echo(f"✅ Created dataframe with {len(final_df)} observations.")
+    typer.echo(f"Created dataframe with {len(final_df)} observations.")
 
     root = Path(__file__).resolve().parents[2]
     output_path = root / "data" / "processed" / "variables" / f"{vers}_AINI_variables.csv"
     final_df.to_csv(output_path, index=False)
 
-    typer.echo(f"📂 Saved {vers}_AINI_variables.csv to processed/variables")
+    typer.echo(f"Saved {vers}_AINI_variables.csv to processed/variables")
 
     return final_df

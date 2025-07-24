@@ -59,10 +59,10 @@ class WSJScraper:
         try:
             btn = self.driver.find_element(By.CSS_SELECTOR, "button.agree-btn[title='YES, I AGREE']")
             btn.click()
-            print("🍪 Cookie-Banner accepted")
+            print("Cookie-Banner accepted")
             time.sleep(4)
         except NoSuchElementException:
-            print("ℹ️ No Cookie-Banner found.")
+            print("No Cookie-Banner found.")
 
     def get_article_links(self, limit=None, year=None, month=None, day=None):
         """
@@ -178,9 +178,9 @@ class WSJScraper:
             c.execute("UPDATE articles_index SET scanned_status=1 WHERE id=?", (article_id,))
             conn.commit()
             conn.close()
-            print(f"✅ Article {article_id} saved successfully.")
+            print(f"Article {article_id} saved successfully.")
         except sqlite3.Error as e:
-            print(f"❌ DB Error at article {article_id}: {e}")
+            print(f"DB Error at article {article_id}: {e}")
 
     def close(self):
         """

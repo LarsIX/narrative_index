@@ -86,19 +86,19 @@ def annotate_articles_with_hype(df, min_words=30, save_path=None):
         # Display article metadata and cleaned text in Markdown format
         display(Markdown(f"""
 ---
-### 📄 Article {i+1}/{len(df)} — ID: `{row['article_id']}`  
-**📰 Title:** {row['title']}  
-**📝 Sub-title:** {row['sub_title'] if pd.notnull(row['sub_title']) else "*[No subtitle]*"}  
-**📏 Length:** {word_count} words  
+### Article {i+1}/{len(df)} — ID: `{row['article_id']}`  
+** Title:** {row['title']}  
+** Sub-title:** {row['sub_title'] if pd.notnull(row['sub_title']) else "*[No subtitle]*"}  
+** Length:** {word_count} words  
 
 ---
 
-#### 📚 Cleaned Text:
+#### Cleaned Text:
 {row['corpus']}
 """))
 
         # Prompt user for AI relevance
-        label = input("🤖 Is this article related to AI? (y = yes / n = no / s = skip / q = quit): ").strip().lower()
+        label = input(" Is this article related to AI? (y = yes / n = no / s = skip / q = quit): ").strip().lower()
 
         if label == 'y':
             df.loc[i, 'label_ai_related'] = 1
@@ -110,11 +110,11 @@ def annotate_articles_with_hype(df, min_words=30, save_path=None):
   1 = Moderate hype (optimistic or moderately fearful)
   2 = High hype (bold claims, euphoric or fear-driven urgency)
 """)
-            hype = input("🔥 What is the AI hype level? (0 / 1 / 2): ").strip()
+            hype = input(" What is the AI hype level? (0 / 1 / 2): ").strip()
             if hype in ['0', '1', '2']:
                 df.loc[i, 'hype_level'] = int(hype)
             else:
-                print("⚠️ Invalid hype input. Marking as missing.")
+                print(" Invalid hype input. Marking as missing.")
                 df.loc[i, 'hype_level'] = None
 
         elif label == 'n':
@@ -126,11 +126,11 @@ def annotate_articles_with_hype(df, min_words=30, save_path=None):
             continue
 
         elif label == 'q':
-            print("⏹️ Annotation manually stopped.")
+            print("Annotation manually stopped.")
             break
 
         else:
-            print("⚠️ Invalid input — skipping this article.")
+            print("Invalid input — skipping this article.")
             continue
 
         # Autosave after every annotation if path is provided
@@ -139,11 +139,11 @@ def annotate_articles_with_hype(df, min_words=30, save_path=None):
                 df.to_csv(save_path, index=False)
                 print(f"💾 Autosaved to: {os.path.basename(save_path)}")
             except Exception as e:
-                print("⚠️ Error while saving:", e)
+                print("Error while saving:", e)
 
-        print(f"✅ Done. Total labeled: {df['label_ai_related'].notnull().sum()} / {len(df)}")
+        print(f"Done. Total labeled: {df['label_ai_related'].notnull().sum()} / {len(df)}")
 
-    print("\n🎉 Annotation session completed.")
+    print("\n Annotation session completed.")
     return df[['article_id', 'title', 'sub_title', 'corpus', 'label_ai_related', 'hype_level']]
 
 
@@ -184,39 +184,39 @@ def annotate_articles_hype_pos_neg(df, min_words=30, save_path=None):
 
         word_count = len(str(row['corpus']).split())
         if word_count < min_words:
-            print(f"\n⏭️ Skipping short article ({word_count} words)...")
+            print(f"\n Skipping short article ({word_count} words)...")
             continue
 
         display(Markdown(f"""
 ---
-### 📄 Article {i+1}/{len(df)} — ID: `{row['article_id']}`  
-**📰 Title:** {row['title']}  
-**📝 Sub-title:** {row['sub_title'] if pd.notnull(row['sub_title']) else "*[No subtitle]*"}  
-**📏 Length:** {word_count} words  
+### Article {i+1}/{len(df)} — ID: `{row['article_id']}`  
+** Title:** {row['title']}  
+** Sub-title:** {row['sub_title'] if pd.notnull(row['sub_title']) else "*[No subtitle]*"}  
+** Length:** {word_count} words  
 
 ---
 
-#### 📚 Cleaned Text:
+#### Cleaned Text:
 {row['corpus']}
 """))
 
         # Ask for AI relevance
-        label = input("🤖 Is this article related to AI? (y = yes / n = no / s = skip / q = quit): ").strip().lower()
+        label = input(" Is this article related to AI? (y = yes / n = no / s = skip / q = quit): ").strip().lower()
 
         if label == 'y':
             df.loc[i, 'label_ai_related'] = 1
 
             print("""
-🎯 AI HYPE SCALE (−2 to +2):
+  AI HYPE SCALE (−2 to +2):
   -1 = negative (skeptical, cautious)
    0 = No AI-relation
   +1 = positive (hopeful, positive tone)
 """)
-            hype = input("🔥 What is the AI hype score? (-2 to +2): ").strip()
+            hype = input("What is the AI hype score? (-2 to +2): ").strip()
             if hype in ['-1', '0', '1']:
                 df.loc[i, 'hype_score'] = int(hype)
             else:
-                print("⚠️ Invalid hype input. Marking as missing.")
+                print("Invalid hype input. Marking as missing.")
                 df.loc[i, 'hype_score'] = None
 
         elif label == 'n':
@@ -227,23 +227,23 @@ def annotate_articles_hype_pos_neg(df, min_words=30, save_path=None):
             continue
 
         elif label == 'q':
-            print("⏹️ Annotation manually stopped.")
+            print("Annotation manually stopped.")
             break
 
         else:
-            print("⚠️ Invalid input — skipping this article.")
+            print("Invalid input — skipping this article.")
             continue
 
         if save_path:
             try:
                 df.to_csv(save_path, index=False)
-                print(f"💾 Autosaved to: {os.path.basename(save_path)}")
+                print(f"Autosaved to: {os.path.basename(save_path)}")
             except Exception as e:
-                print("⚠️ Error while saving:", e)
+                print("Error while saving:", e)
 
-        print(f"✅ Done. Total labeled: {df['label_ai_related'].notnull().sum()} / {len(df)}")
+        print(f"Done. Total labeled: {df['label_ai_related'].notnull().sum()} / {len(df)}")
 
-    print("\n🎉 Annotation session completed.")
+    print("\n Annotation session completed.")
     return df[['article_id', 'title', 'sub_title', 'corpus', 'label_ai_related', 'hype_score']]
 
 def annotate_articles_with_window(df, min_words=30, save_path=None,  max_tokens=512,
@@ -289,30 +289,30 @@ def annotate_articles_with_window(df, min_words=30, save_path=None,  max_tokens=
 
         display(Markdown(f"""
 ---
-### 📄 Article {i+1}/{len(df)} — ID: `{row['article_id']}`  
+### Article {i+1}/{len(df)} — ID: `{row['article_id']}`  
 ---
 
-#### 📚 Cleaned Text:
+#### Cleaned Text:
 {row['ai_window']}
 """))
 
         # Ask for AI relevance
-        label = input("🤖 Is this article related to AI? (y = yes / n = no / s = skip / q = quit): ").strip().lower()
+        label = input("Is this article related to AI? (y = yes / n = no / s = skip / q = quit): ").strip().lower()
 
         if label == 'y':
             df.loc[i, 'label_ai_related'] = 1
 
             print("""
-🎯 AI HYPE SCALE (−2 to +2):
+ AI HYPE SCALE (−2 to +2):
   -1 = negative (skeptical, cautious)
    0 = No AI-relation
   +1 = positive (hopeful, positive tone)
 """)
-            hype = input("🔥 What is the AI hype score? (-2 to +2): ").strip()
+            hype = input("What is the AI hype score? (-2 to +2): ").strip()
             if hype in ['-1', '0', '1']:
                 df.loc[i, 'hype_score'] = int(hype)
             else:
-                print("⚠️ Invalid hype input. Marking as missing.")
+                print("Invalid hype input. Marking as missing.")
                 df.loc[i, 'hype_score'] = None
 
         elif label == 'n':
@@ -327,17 +327,17 @@ def annotate_articles_with_window(df, min_words=30, save_path=None,  max_tokens=
             break
 
         else:
-            print("⚠️ Invalid input — skipping this article.")
+            print("Invalid input — skipping this article.")
             continue
 
         if save_path:
             try:
                 df.to_csv(save_path, index=False)
-                print(f"💾 Autosaved to: {os.path.basename(save_path)}")
+                print(f"Autosaved to: {os.path.basename(save_path)}")
             except Exception as e:
-                print("⚠️ Error while saving:", e)
+                print("Error while saving:", e)
 
-        print(f"✅ Done. Total labeled: {df['label_ai_related'].notnull().sum()} / {len(df)}")
+        print(f"Done. Total labeled: {df['label_ai_related'].notnull().sum()} / {len(df)}")
 
-    print("\n🎉 Annotation session completed.")
+    print("\n Annotation session completed.")
     return df[['article_id', 'title', 'sub_title', 'corpus', 'ai_window', 'label_ai_related', 'hype_score']]

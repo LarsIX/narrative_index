@@ -57,7 +57,7 @@ class ManagementDB:
             ))
             self.conn.commit()
         except sqlite3.Error as e:
-            print(f"❌ Insert Error: {e}")
+            print(f" Insert Error: {e}")
 
     def exploration(self, link, day, month, year, page_num, values_or_not, count_articles):
         """
@@ -89,7 +89,7 @@ class ManagementDB:
             """, (link, day, month, year, page_num, current_time, values_or_not, count_articles))
             self.conn.commit()
         except sqlite3.Error as e:
-            print(f"❌ Exploration Logging Error: {e}")
+            print(f" Exploration Logging Error: {e}")
 
     def link_exists(self, link):
         """
@@ -166,12 +166,12 @@ class WSJMetadataCrawler:
             if self.page_number > 1:
                 url += f"?page={self.page_number}"
 
-            print(f"\n🔎 Scraping URL: {url}")
+            print(f"\n Scraping URL: {url}")
             headers = {'User-Agent': 'Mozilla/5.0'}
             response = requests.get(url, headers=headers)
 
             if response.status_code != 200:
-                print(f"❌ Page error: {response.status_code}")
+                print(f" Page error: {response.status_code}")
                 break
 
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -180,7 +180,7 @@ class WSJMetadataCrawler:
 
             if not article_elements:
                 db.exploration(url, day, month, year, self.page_number, 0, 0)
-                print(f"✅ Done with {day}-{month}-{year}. Total articles: {self.total_articles}")
+                print(f" Done with {day}-{month}-{year}. Total articles: {self.total_articles}")
                 break
 
             count_articles = 0
@@ -261,6 +261,6 @@ def search_year(year, wait=5, db_path=DEFAULT_DB_PATH, allowed_sections=None):
     """
     crawler = WSJMetadataCrawler(db_path=db_path, allowed_sections=allowed_sections)
     for day, month, y in get_dates(year):
-        print(f"📅 Processing {day}-{month}-{y}")
+        print(f"Processing {day}-{month}-{y}")
         crawler.get_elements_from_web(y, month, day, wait)
         time.sleep(wait)

@@ -15,7 +15,7 @@ def run(year: int = typer.Option(..., help="Insert year to subset.")):
 
     results = subset_database(year = year)
 
-    typer.echo(f"💾 Saved {results['n_articles']} articles to {results['db_path']}")
+    typer.echo(f"Saved {results['n_articles']} articles to {results['db_path']}")
 
 # CLI entry point
 if __name__ == "__main__":
