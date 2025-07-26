@@ -46,7 +46,7 @@ To quantify the AI Narrative Index (AINI), this project implements **three compl
 
 ---
 
-### 3. AINI via ChatGPT Labeling and Prompt Engineering *(modules under construction, uploaded soon)*
+### 3. AINI via ChatGPT Labeling and Prompt Engineering
 
 - WSJ articles are labeled for **AI relevance** using **GPT-4 via the OpenAI API**, with few-shot prompting and *Chain-of-Thought* reasoning.
 
@@ -57,7 +57,6 @@ To quantify the AI Narrative Index (AINI), this project implements **three compl
 - Ongoing evaluation focuses on:
   - Agreement between GPT labels and human annotations  
   - Stability across prompt designs and reasoning chains  
-  - Effectiveness of GPT labeling as a **scalable weak supervision** method
 
 ## Statistical Testing & Causal Inference
 
