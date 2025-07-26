@@ -108,7 +108,8 @@ AI_narrative_index/
 │
 │   ├── annotation/
 │   │   ├── comparing_annotations.py            # Resolve disagreements between annotators
-│   │   └── label_articles.py                   # Launch interactive tool for AI and hype annotation
+│   │   ├──  label_articles.py                  # Launch interactive tool for AI and hype annotation
+│       └── prompt_gpt.py                       # Prompt GPT to annotate articles
 │
 │   ├── modelling/
 │   │   ├── ai_windows.py                       # Extract context-aware snippets around AI keywords
@@ -139,12 +140,13 @@ AI_narrative_index/
 │   ├── investigating_FinBERT_annotations.ipynb # Inspect FinBERT predictions across configurations
 │   ├── exploratory_analysis_wsj.ipynb          # Explore WSJ article dataset and structure
 │   ├── sample_articles.ipynb                   # Sample articles for manual annotation
-│   ├── label_articles.ipynb                    # Manually annotate AI and hype relevance
+│   ├── label_manually.ipynb                    # Manually annotate AI relevance and sentiment 
 │   ├── test_stationarity.ipynb                 # Perform visual and statistical stationarity tests
 │   ├── estimate_transfer_entropy.ipynb         # Estimate transfer entropy for causal analysis
 │   ├── estimate_granger_causality.ipynb        # Apply Granger causality to AINI and financial data
 │   ├── analyse_gc_results.ipynb                # Inspect and visualize Granger causality results
 │   ├── visualize_ksg.ipynb                     # Explain the Kraskov estimator for entropy
+│   ├── label_with_gpt.ipynb                    # Annotate articles with GPT
 │   └── visualize_aini_variables.ipynb          # Explore AINI index trends and dynamics
 │
 ├── data/

@@ -1,6 +1,14 @@
 # Data
 /data/
 
+# models
+/models
+
+models/
+*.pt
+*.bin
+*.safetensors
+
 # Mac OS-specific storage files
 .DS_Store
 
