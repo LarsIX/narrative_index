@@ -2,8 +2,9 @@
 Interactive Article Annotation Module
 
 This module provides interactive tools to annotate news articles for:
-- AI relevance (`label_ai_related`)
-- AI hype level or sentiment (`hype_level` or `hype_score`)
+- AI relevance (`label_ai_related` or `relevance`)
+- AI hype level or sentiment (`hype_level`, `hype_score`)
+- Annotation rationale (`comments`) for model training or few-shot use
 
 Designed primarily for use in Jupyter Notebooks, these tools facilitate human-in-the-loop labeling
 of financial news articles, e.g., from the Wall Street Journal, for training and evaluating NLP models.
@@ -20,12 +21,19 @@ Functions
     First extracts human-readable AI-relevant snippets using a Transformer tokenizer window,
     then classifies and annotates them interactively using the −1 to +1 hype scale.
 
+- find_training_examples(df, min_words=30, save_path=None, max_tokens=512, context_window=1):
+    Interactive annotation function for manually labeling articles with relevance tags
+    ("0", "1e", "1h") and optional comments. Outputs are suitable for few-shot learning
+    with ChatPromptTemplate or OpenAI API-based LLMs.
+
 Intended Use
 ------------
 Use this module during the manual labeling phase of a supervised learning pipeline to:
-- Construct training data for FinBERT or similar transformer-based models
-- Resolve ambiguous or context-dependent articles through direct human judgment
+- Construct high-quality training data for transformer-based models like FinBERT
+- Create few-shot prompts with human-validated context windows
+- Capture rationale to improve explainability and prompt engineering
 """
+
 
 
 import pandas as pd
@@ -341,3 +349,174 @@ def annotate_articles_with_window(df, min_words=30, save_path=None,  max_tokens=
 
     print("\n Annotation session completed.")
     return df[['article_id', 'title', 'sub_title', 'corpus', 'ai_window', 'label_ai_related', 'hype_score']]
+
+
+def find_shots(df, save_path=None, max_tokens=512, context_window=1):
+    """
+    Interactive annotation function for AI relevance and ease of annotation.
+    
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Must contain: 'article_id', 'title', 'sub_title', 'corpus'
+
+    save_path : str or None
+        Optional CSV path for autosaving after each annotation.
+    
+    Returns
+    -------
+    pd.DataFrame
+        Annotated dataframe with 'relevance' column.
+    """
+    
+    # Add annotation column if missing
+    if 'relevance' not in df.columns:
+        df['relevance'] = None
+
+    # Apply window function (assumed implemented elsewhere)
+    df = extract_human_readable_snippet(
+        df,
+        title_col="title",
+        text_col="corpus",
+        output_col="ai_window",
+        tokenizer_name="bert-base-uncased",
+        max_tokens=max_tokens,
+        context_window=context_window
+    )
+
+    for i, row in df.iterrows():
+        # Skip already labeled
+        if pd.notnull(row['relevance']):
+            continue
+
+        display(Markdown(f"""
+---
+### Article {i+1}/{len(df)} — ID: `{row['article_id']}`  
+#### Title: {row['title']}
+---
+
+#### Text Snippet:
+{row['ai_window']}
+"""))
+
+        # Get user input
+        label = input("AI relevance? [0 = Not related, 1e = Related (Easy), 1h = Related (Hard), s = skip, q = quit]: ").strip().lower()
+
+        if label == 'q':
+            print("⏹️ Annotation manually stopped.")
+            break
+        elif label == 's':
+            continue
+        elif label in ['0', '1e', '1h']:
+            df.at[i, 'relevance'] = label
+        else:
+            print("import pandas as pd
+from IPython.display import display, Markdown
+import os
+
+def find_training_examples(df, min_words=30, save_path=None, max_tokens=512, context_window=1):
+    """
+    Interactive annotation function for creating few-shot training examples
+    for ChatPromptTemplate-based prompting (e.g. OpenAI or LangChain).
+
+    Each article will be labeled for AI relevance:
+        - "0"  = Not related to AI
+        - "1e" = Related to AI, easy to identify
+        - "1h" = Related to AI, but subtle or complex
+
+    Additionally, optional comments can be added as rationale.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe with required columns: 'article_id', 'title', 'sub_title', 'corpus'.
+
+    min_words : int
+        Minimum number of words in 'corpus' for an article to be shown.
+
+    save_path : str or None
+        Optional CSV path to autosave after each annotation step.
+
+    max_tokens : int
+        Token limit for the extracted article snippet (used for model context).
+
+    context_window : int
+        Number of surrounding sentences included around AI keywords.
+
+    Returns
+    -------
+    pd.DataFrame
+        The same dataframe with added columns:
+        - 'ai_window'   : Context-aware snippet used for prompting
+        - 'relevance'   : One of {"0", "1e", "1h"}
+        - 'comments'    : Optional annotator rationale
+    """
+
+    # Add annotation columns if missing
+    if 'relevance' not in df.columns:
+        df['relevance'] = None
+    if 'comments' not in df.columns:
+        df['comments'] = None
+
+    # Apply window function (user-defined function assumed)
+    df = extract_human_readable_snippet(
+        df,
+        title_col="title",
+        text_col="corpus",
+        output_col="ai_window",
+        tokenizer_name="bert-base-uncased",
+        max_tokens=max_tokens,
+        context_window=context_window
+    )
+
+    for i, row in df.iterrows():
+        if pd.notnull(row['relevance']):
+            continue
+        if len(str(row['corpus']).split()) < min_words:
+            continue
+
+        display(Markdown(f"""
+---
+### Article {i+1}/{len(df)} — ID: `{row['article_id']}`  
+#### Title: {row['title']}
+---
+
+#### Text Snippet:
+{row['ai_window']}
+"""))
+
+        label = input("AI relevance? [0 = Not related, 1e = Related (Easy), 1h = Related (Hard), s = skip, q = quit]: ").strip().lower()
+
+        if label == 'q':
+            print("Annotation manually stopped.")
+            break
+        elif label == 's':
+            continue
+        elif label in ['0', '1e', '1h']:
+            df.at[i, 'relevance'] = label
+            label_name = {
+                '0': "Not related",
+                '1e': "Related (Easy)",
+                '1h': "Related (Hard)"
+            }.get(label)
+            print(f"Labeled as {label}: {label_name}")
+        else:
+            print("Invalid input — skipping this article.")
+            continue
+
+        comment = input("Optional comment (or press Enter to skip): ").strip()
+        if comment:
+            df.at[i, 'comments'] = comment
+
+        if save_path:
+            try:
+                df.to_csv(save_path, index=False)
+                print(f"Autosaved to: {os.path.basename(save_path)}")
+            except Exception as e:
+                print("Error while saving:", e)
+
+        total_labeled = df['relevance'].notnull().sum()
+        print(f"Labeled total: {total_labeled} / {len(df)}\n")
+
+    print("Annotation session completed.")
+    return df[['article_id', 'title', 'sub_title', 'corpus', 'ai_window', 'relevance', 'comments']]
