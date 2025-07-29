@@ -143,6 +143,7 @@ AI_narrative_index/
 │   ├── exploratory_analysis_wsj.ipynb          # Explore WSJ article dataset and structure
 │   ├── sample_articles.ipynb                   # Sample articles for manual annotation
 │   ├── label_manually.ipynb                    # Manually annotate AI relevance and sentiment 
+│   ├── benchmark_windows.ipynb                 # Benchmarks naive AI windows against manual annotation
 │   ├── test_stationarity.ipynb                 # Perform visual and statistical stationarity tests
 │   ├── estimate_transfer_entropy.ipynb         # Estimate transfer entropy for causal analysis
 │   ├── estimate_granger_causality.ipynb        # Apply Granger causality to AINI and financial data
