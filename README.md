@@ -102,9 +102,10 @@ AI_narrative_index/
 │   │   ├── clean_database.py                   # Clean and filter articles by section, length, and duplicates
 │   │   ├── corpus_cleaning.py                  # Remove UI/meta elements from WSJ article text
 │   │   ├── reduce_db_for_sentiment.py          # Extract article subset for sentiment prediction
+│   │   ├── combine_article_dbs.py              # Concatenates yearly WSJ-Databases into single CSV
 │   │   ├── section_filtering.py                # Filter irrelevant WSJ sections from the database
 │   │   └── simple_ai_filter.py                 # Flag articles that mention AI-related terms
-│
+│   │   
 │   ├── annotation/
 │   │   ├── comparing_annotations.py            # Resolve disagreements between annotators
 │   │   ├──  label_articles.py                  # Launch interactive tool for AI and hype annotation
@@ -131,6 +132,7 @@ AI_narrative_index/
 │   │   ├── run_predict_investor_sentiment.py   # Apply sentiment prediction using standard FinBERT
 │   │   ├── run_predict_binary_AINI_FinBERT.py  # Run binary AINI classification pipeline
 │   │   ├── run_predict_AINI_FinBERT_window.py  # Run context-aware classification on snippets
+│   │   │── run_combine_article_dbs.py          # Concatenates yearly WSJ-Databases into single CSV
 │   │   │── run_naive_labeling.py               # Label AI-relavance based on naive keywords
 │   │   └── run_construct_AINI_variables.py     # Construct final AINI index file for modeling
 │
