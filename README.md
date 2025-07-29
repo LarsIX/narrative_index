@@ -131,6 +131,7 @@ AI_narrative_index/
 │   │   ├── run_predict_investor_sentiment.py   # Apply sentiment prediction using standard FinBERT
 │   │   ├── run_predict_binary_AINI_FinBERT.py  # Run binary AINI classification pipeline
 │   │   ├── run_predict_AINI_FinBERT_window.py  # Run context-aware classification on snippets
+│   │   │── run_naive_labeling.py               # Label AI-relavance based on naive keywords
 │   │   └── run_construct_AINI_variables.py     # Construct final AINI index file for modeling
 │
 ├── notebooks/

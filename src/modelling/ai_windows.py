@@ -331,8 +331,6 @@ def extract_multiple_ai_snippets_title_context(
 
     return df
 
-
-
 def extract_human_readable_snippet(
     df,
     title_col="title",
