@@ -2,7 +2,7 @@
 CLI app to generate naive AI relevance labels from article files.
 
 Usage:
-    python run_naive_labeling.py 2024 --file annotated_subsample_WSJ_final.csv
+    python run_naive_labeling.py 2023 --file articlesWSJ_clean_2023.csv
 """
 
 import typer
@@ -22,8 +22,9 @@ app = typer.Typer()
 
 @app.command()
 def run(
-    year: int = typer.Argument(..., help="Year of the articles (used in output filename)"),
+    year: str = typer.Argument(..., help="Year of the articles (used in output filename)"),
     file: str = typer.Option(..., help="CSV filename in data/processed/articles/ to label"),
+    subset: bool = typer.Option(False,help="Indicate if applied to annotated subset"),
     title_col: str = typer.Option("title", help="Column name for article titles"),
     text_col: str = typer.Option("corpus", help="Column name for article text"),
     output_col: str = typer.Option("about_ai", help="Name of the output label column")
@@ -33,13 +34,14 @@ def run(
 
     This function loads a CSV from `data/processed/articles/`,
     checks for AI keywords in title and corpus,
+    flags if a annotated subset is used,
     and saves the labeled file as `naive_AI_labels_{year}.csv`.
     """
 
     data_dir = project_root / "data" / "processed" / "articles"
     input_path = data_dir / file
-    output_path = data_dir / f"naive_AI_labels_{year}.csv"
-
+    filename = f"naive_AI_labels_annotated_sub_{year}.csv" if subset else f"naive_AI_labels_{year}.csv"
+    output_path = data_dir / filename
     df = pd.read_csv(input_path)
     df = naive_labeling(df, title_col=title_col, text_col=text_col, output_col=output_col)
 
