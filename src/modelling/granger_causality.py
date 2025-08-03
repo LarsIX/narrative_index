@@ -24,7 +24,6 @@ from tqdm import tqdm
 sys.path.append(str(Path(__file__).resolve().parent.parent / "modelling"))
 from format_te_gc_inputs import get_ticker_for_granger
 
-
 def estimate_bootstraped_gc(
     aini_data,
     fin_data_by_year,
@@ -64,7 +63,7 @@ def estimate_bootstraped_gc(
     Returns
     -------
     pd.DataFrame
-        Full results with F-test p-values, bootstrap p-values, heteroskedasticity stats, and model info.
+        Full results with F-test statistics, p-values, bootstrap p-values, heteroskedasticity stats, and model info.
     """
     np.random.seed(seed)
 
@@ -80,7 +79,9 @@ def estimate_bootstraped_gc(
     direction_flag = 'return_to_AINI' if reverse else 'AINI_to_return'
     file_name = f"gc_bootstrap_F_all_lags_groupwise_{direction_flag}"
     if window is not None:
-        file_name += f"_w{window}"
+        file_name += f"_3class_w{window}"
+    else:
+        file_name += "_binary"
     file_name += ".csv"
     output_path = var_path / file_name
 
@@ -104,7 +105,7 @@ def estimate_bootstraped_gc(
                     for lag in lag_range:
                         try:
                             orig_test = grangercausalitytests(base_input, maxlag=lag, verbose=False)
-                            orig_f_p = orig_test[lag][0]['ssr_ftest'][1]
+                            f_stat, f_pval = orig_test[lag][0]['ssr_ftest'][0:2]
                             model = orig_test[lag][1][0]
                             aic = model.aic
                             bic = model.bic
@@ -117,6 +118,7 @@ def estimate_bootstraped_gc(
                             bp_stat, bp_pval, _, _ = het_breuschpagan(resid, exog)
                             white_stat, white_pval, _, _ = het_white(resid, exog)
 
+                            # Bootstrap p-value estimation
                             boot_f_pvals = []
                             for _ in range(n_bootstrap):
                                 idx = np.random.choice(len(base_input), len(base_input), replace=True)
@@ -127,26 +129,27 @@ def estimate_bootstraped_gc(
                                 except:
                                     continue
 
-                            emp_f_p = (np.sum(np.array(boot_f_pvals) <= orig_f_p) + 1) / (len(boot_f_pvals) + 1)
+                            emp_f_pval = (np.sum(np.array(boot_f_pvals) <= f_pval) + 1) / (len(boot_f_pvals) + 1)
 
                             result = {
                                 "Ticker": ticker,
                                 "AINI_variant": var,
                                 "Year": year,
                                 "Lag": lag,
-                                "Original_F_p": orig_f_p,
-                                "Empirical_F_p": emp_f_p,
+                                "Original_F": f_stat,
+                                "Original_F_pval": f_pval,
+                                "Empirical_F_pval": emp_f_pval,
                                 "AIC": aic,
                                 "BIC": bic,
-                                "N_boot": len(boot_f_pvals),
-                                "bp_stat" : bp_stat,
+                                "N_boot": n_bootstrap,
+                                "bp_stat": bp_stat,
                                 "BP_pval": bp_pval,
-                                "white_stat" : white_stat,
+                                "White_stat": white_stat,
                                 "White_pval": white_pval,
                                 "BP_reject": bp_pval < 0.05,
                                 "White_reject": white_pval < 0.05,
                                 "Reverse": reverse,
-                                "window": window
+                                "Window": window
                             }
 
                             for name, val in zip(coef_names, coefs):
@@ -166,13 +169,13 @@ def estimate_bootstraped_gc(
     corrected = []
     for (ticker, year), group in gc_df.groupby(["Ticker", "Year"]):
         try:
-            reject, pvals_corr = multipletests(group["Empirical_F_p"], alpha=alpha, method="fdr_bh")[:2]
+            reject, pvals_corr = multipletests(group["Empirical_F_pval"], alpha=alpha, method="fdr_bh")[:2]
             group["BH_reject_F"] = reject
-            group["BH_corr_F"] = pvals_corr
+            group["BH_corr_F_pval"] = pvals_corr
         except Exception as e:
             print(f"BH correction failed for {ticker}, {year}: {e}")
             group["BH_reject_F"] = False
-            group["BH_corr_F"] = np.nan
+            group["BH_corr_F_pval"] = np.nan
         corrected.append(group)
 
     gc_df = pd.concat(corrected, ignore_index=True)

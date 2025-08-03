@@ -182,7 +182,7 @@ def label_data(year, batch_size=16):
     df_unlabeled["predicted_class"] = df_unlabeled["predicted_label"].map({0: "No narrative", 1: "Narrative"})
 
     # Save
-    output_path = project_root / "data" / "processed" / "variables" / f"AIrel_prediction_{year}.csv"
+    output_path = project_root / "data" / "processed" / "variables" / f"FinBERT_binary_prediction_{year}.csv"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df_unlabeled.to_csv(output_path, index=False)
 

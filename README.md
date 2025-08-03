@@ -97,7 +97,7 @@ AI_narrative_index/
 │   │   ├── wsj_archive_crawler.py              # Crawl WSJ archive pages to collect article URLs
 │   │   ├── wsj_archive_scraper.py              # Scrape full article content from collected WSJ URLs
 │   │   └── run_predict_AINI.py                 # Apply trained AINI model to WSJ text for predictions
-│
+│   │
 │   ├── preprocessing/
 │   │   ├── clean_database.py                   # Clean and filter articles by section, length, and duplicates
 │   │   ├── corpus_cleaning.py                  # Remove UI/meta elements from WSJ article text
@@ -108,9 +108,9 @@ AI_narrative_index/
 │   │   
 │   ├── annotation/
 │   │   ├── comparing_annotations.py            # Resolve disagreements between annotators
-│   │   ├──  label_articles.py                  # Launch interactive tool for AI and hype annotation
-│       └── prompt_gpt.py                       # Prompt GPT to annotate articles
-│
+│   │   ├── label_articles.py                   # Launch interactive tool for AI and hype annotation
+│   │   └── prompt_gpt.py                       # Prompt GPT to annotate articles
+│   │
 │   ├── modelling/
 │   │   ├── ai_windows.py                       # Extract context-aware snippets around AI keywords
 │   │   ├── predict_binary_AINI_FinBERT.py      # Classify articles (AI-related vs. not) using FinBERT
@@ -120,10 +120,14 @@ AI_narrative_index/
 │   │   ├── transfer_entropy.py                 # Estimate Transfer Entropy between AINI and financial variables
 │   │   ├── granger_causality.py                # Run Granger causality with heteroskedasticity-aware bootstrapping
 │   │   └── construct_AINI_variables.py         # Build daily AINI index with normalization, EMA, growth etc.
-│
+│   │
 │   ├── visualizations/
 │   │   └── plot_granger_causality.py           # Visualize Granger causality outputs
-│
+│   │  
+│   ├── databases/
+│   │   ├── fix_article_ids_in_db.py            # ensures unique article_id in database 
+│   │   └── create_database.py                  # creates SQL database with article & articles_id table
+│   │
 │   ├── scripts/                                # CLI entry points for reproducible execution
 │   │   ├── run_create_database.py              # Initialize article database schema and structure
 │   │   ├── run_wsj_scraper.py                  # Run WSJ crawler and scraper
@@ -133,33 +137,35 @@ AI_narrative_index/
 │   │   ├── run_predict_binary_AINI_FinBERT.py  # Run binary AINI classification pipeline
 │   │   ├── run_predict_AINI_FinBERT_window.py  # Run context-aware classification on snippets
 │   │   │── run_combine_article_dbs.py          # Concatenates yearly WSJ-Databases into single CSV
+│   │   │── run_fix_article_ids                 # Run function to ensure unique article_id in database
 │   │   │── run_naive_labeling.py               # Label AI-relavance based on naive keywords
-│   │   └── run_construct_AINI_variables.py     # Construct final AINI index file for modeling
+│       └── run_construct_AINI_variables.py     # Construct final AINI index file for modeling
 │
 ├── notebooks/
-│   ├── compare_resolve_annotations.ipynb       # Resolve annotation disagreements interactively
-│   ├── training_FinBERT_annotation.ipynb       # Fine-tune FinBERT on AI-relatedness labels
-│   ├── investigating_FinBERT_annotations.ipynb # Inspect FinBERT predictions across configurations
-│   ├── exploratory_analysis_wsj.ipynb          # Explore WSJ article dataset and structure
-│   ├── sample_articles.ipynb                   # Sample articles for manual annotation
-│   ├── label_manually.ipynb                    # Manually annotate AI relevance and sentiment 
-│   ├── benchmark_windows.ipynb                 # Benchmarks naive AI windows against manual annotation
-│   ├── test_stationarity.ipynb                 # Perform visual and statistical stationarity tests
-│   ├── estimate_transfer_entropy.ipynb         # Estimate transfer entropy for causal analysis
-│   ├── estimate_granger_causality.ipynb        # Apply Granger causality to AINI and financial data
-│   ├── analyse_gc_results.ipynb                # Inspect and visualize Granger causality results
-│   ├── visualize_ksg.ipynb                     # Explain the Kraskov estimator for entropy
-│   ├── label_with_gpt.ipynb                    # Annotate articles with GPT
-│   └── visualize_aini_variables.ipynb          # Explore AINI index trends and dynamics
+│       ├── compare_annotations.ipynb          # Resolve annotation disagreements interactively
+│       ├── train_FinBERT_annot.ipynb          # Fine-tune FinBERT on AI-relatedness labels
+│       ├── explore_FinBERT_annotat.ipynb      # Inspect FinBERT predictions across configurations
+│       ├── exploratory_analysis_wsj.ipynb     # Explore WSJ article dataset and structure
+│       ├── sample_articles.ipynb              # Sample articles for manual annotation
+│       ├── label_manually.ipynb               # Manually annotate AI relevance and sentiment 
+│       ├── benchmark_windows.ipynb            # Benchmarks naive AI windows against manual annotation
+│       ├── test_stationarity.ipynb            # Perform visual and statistical stationarity tests
+│       ├── predict_transfer_entropy.ipynb     # Estimate transfer entropy for causal analysis
+│       ├── predict_granger_causality.ipynb    # Estimate Apply Granger causality between AINI and asset returns
+│       ├── analyse_gc_results.ipynb           # Inspect and visualize Granger causality results
+│       ├── compare_classification_vars.ipynb  # Benchmarks different classification methods
+│       ├── visualize_ksg.ipynb                # Explain the Kraskov estimator for entropy
+│       ├── label_with_gpt.ipynb               # Annotate articles with GPT
+│       └── visualize_aini_variables.ipynb     # Explore AINI index trends and dynamics
 │
 ├── data/
-│   ├── raw/                                    # Contain scraped articles and raw financial data
-│   ├── interim/                                # Store intermediate outputs (e.g. annotated WSJ batches)
+│   ├── raw/                                   # Contain scraped articles and raw financial data
+│   ├── interim/                               # Store intermediate outputs (e.g. annotated WSJ batches)
 │   └── processed/
-│       ├── variables/                          # Store constructed variables (e.g. AINI, sentiment, TE)
-│       └── articles/                           # Store cleaned and filtered article texts
+│       ├── variables/                         # Store constructed variables (e.g. AINI, sentiment, TE)
+│       └── articles/                          # Store cleaned and filtered article texts
 │
-└── models/                                     # Store fine-tuned FinBERT and sentiment models
+└── models/                                    # Store fine-tuned FinBERT and sentiment models
 
 </pre>
 ---

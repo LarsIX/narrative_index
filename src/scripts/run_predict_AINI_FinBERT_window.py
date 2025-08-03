@@ -3,7 +3,7 @@ CLI tool to run AINI prediction via FinBERT utilizing context windows.
 
 Usage:
     python run_predict_AINI_FinBERT_window.py run --year 2023 --batch-size 4 --context-window 1 --max-tokens 512
-    python run_predict_AINI_FinBERT_window.py run-all --start-year 2023 --end-year 2025 --context-window 1
+    python run_predict_AINI_FinBERT_window.py run-all --start-year 2023 --end-year 2025 --context-window 2
 """
 
 from pathlib import Path
