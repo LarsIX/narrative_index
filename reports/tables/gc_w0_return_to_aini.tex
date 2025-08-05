@@ -1,0 +1,31 @@
+\begin{table}[H]
+\normalsize
+\centering
+\caption{Granger Causality from Log Returns to AINI (Three-Class), context window = 0}
+\label{tab:gc_coef_ret_to_aini_w0}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{l l l r r r r}
+\toprule
+Ticker & AINI Variant & Year & Coef x1 & Coef x2 & F-Stat & FDR p-val \\
+\midrule
+AAPL & normalized\_AINI\_growth & 2023--2024 & -0.36 &  & 6.52* & 0.081 \\
+GOOGL & normalized\_AINI & 2025 & 0.61 & 0.00 & 4.31* & 0.073 \\
+GOOGL & EMA\_08 & 2025 & 0.82 & -0.16 & 3.87* & 0.088 \\
+GOOGL & normalized\_AINI\_growth & 2025 & -0.07 & 0.02 & 5.48* & 0.071 \\
+GOOGL & normalized\_AINI & 2023--2025 & 0.35 & 0.13 & 3.87* & 0.094 \\
+GOOGL & EMA\_08 & 2023--2025 & 0.53 & 0.05 & 3.52* & 0.094 \\
+GOOGL & normalized\_AINI\_growth & 2023--2025 & -0.25 & -0.03 & 6.67** & 0.016 \\
+GOOGL & normalized\_AINI & 2024--2025 & 0.45 & 0.09 & 4.08* & 0.083 \\
+GOOGL & EMA\_08 & 2024--2025 & 0.64 & -0.02 & 3.65* & 0.086 \\
+GOOGL & normalized\_AINI\_growth & 2024--2025 & -0.20 & -0.02 & 5.74** & 0.034 \\
+META & normalized\_AINI & 2023 & 0.09 &  & 4.68* & 0.085 \\
+META & EMA\_08 & 2023 & 0.27 &  & 4.13* & 0.089 \\
+META & normalized\_AINI\_growth & 2023 & -0.35 &  & 6.50* & 0.085 \\
+META & normalized\_AINI\_growth & 2023 & -0.37 & -0.06 & 3.86* & 0.085 \\
+\bottomrule
+\end{tabular}
+
+}
+\vspace{0.2cm}
+\textit{Note:} \textbf{***} p$<$0.01, \textbf{**} p$<$0.05, \textbf{*} p$<$0.1
+\end{table}

@@ -1,0 +1,29 @@
+\begin{table}[H]
+\normalsize
+\centering
+\caption{Granger Causality from Log Returns to AINI (Three-Class), context window = 0, Diagnostics}
+\label{tab:gc_diagn_ret_to_aini_w0}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{l l l r r r r r r r}
+\toprule
+Ticker & AINI Variant & Year & Lag & AIC & BIC & BP Stat & BP p-val & White Stat & White p-val \\
+\midrule
+AAPL & normalized\_AINI\_growth & 2023--2024 & 1 & -1182.003192 & -1173.834193 & 0.02 & 0.885 & 40.76*** & 0.000 \\
+GOOGL & normalized\_AINI & 2025 & 2 & -158.231196 & -150.601312 & 51.51*** & 0.000 & 55.45*** & 0.000 \\
+GOOGL & EMA\_08 & 2025 & 2 & -198.272621 & -190.642737 & 52.04*** & 0.000 & 55.82*** & 0.000 \\
+GOOGL & normalized\_AINI\_growth & 2025 & 2 & -135.399463 & -127.769579 & 0.15 & 0.927 & 1.85 & 0.869 \\
+GOOGL & normalized\_AINI & 2023--2025 & 2 & -1397.860430 & -1385.019243 & 165.80*** & 0.000 & 268.79*** & 0.000 \\
+GOOGL & EMA\_08 & 2023--2025 & 2 & -1614.473803 & -1601.632615 & 167.08*** & 0.000 & 271.01*** & 0.000 \\
+GOOGL & normalized\_AINI\_growth & 2023--2025 & 2 & -1243.316892 & -1230.475704 & 1.62 & 0.445 & 41.39*** & 0.000 \\
+GOOGL & normalized\_AINI & 2024--2025 & 2 & -877.368942 & -865.829626 & 136.27*** & 0.000 & 195.97*** & 0.000 \\
+GOOGL & EMA\_08 & 2024--2025 & 2 & -1019.617434 & -1008.078117 & 138.79*** & 0.000 & 195.81*** & 0.000 \\
+GOOGL & normalized\_AINI\_growth & 2024--2025 & 2 & -790.522375 & -778.983059 & 1.17 & 0.557 & 17.64*** & 0.003 \\
+META & normalized\_AINI & 2023 & 1 & -532.363077 & -525.900859 & 1.51 & 0.219 & 1.67 & 0.434 \\
+META & EMA\_08 & 2023 & 1 & -610.069791 & -603.607574 & 1.26 & 0.261 & 1.65 & 0.439 \\
+META & normalized\_AINI\_growth & 2023 & 1 & -449.554223 & -443.092006 & 0.32 & 0.573 & 20.63*** & 0.000 \\
+META & normalized\_AINI\_growth & 2023 & 2 & -444.886463 & -435.209223 & 4.21 & 0.122 & 25.88*** & 0.000 \\
+\bottomrule
+\end{tabular}
+
+}
+\end{table}

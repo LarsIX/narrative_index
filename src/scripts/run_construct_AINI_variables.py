@@ -3,10 +3,10 @@ CLI app to construct AINI variables from FinBERT prediction files.
 
 Usage:
     python run_construct_AINI_variables.py `
-        FinBERT_AINI_prediction_2023_windsize_2.csv `
-        FinBERT_AINI_prediction_2024_windsize_2.csv `
-        --file3 FinBERT_AINI_prediction_2025_windsize_2.csv `
-        --vers w2
+        FinBERT_AINI_prediction_2023_windsize_0.csv `
+        FinBERT_AINI_prediction_2024_windsize_0.csv `
+        --file3 FinBERT_AINI_prediction_2025_windsize_0.csv `
+        --vers w0
 """
 
 import typer

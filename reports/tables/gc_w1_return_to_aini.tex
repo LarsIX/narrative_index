@@ -1,0 +1,34 @@
+\begin{table}[H]
+\normalsize
+\centering
+\caption{Granger Causality from Log Returns to AINI (Three-Class)}
+\label{tab:gc_coef_ret_to_aini_w1}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{l l l r r r r}
+\toprule
+Ticker & AINI Variant & Year & Coef x1 & Coef x2 & F-Stat & FDR p-val \\
+\midrule
+AVGO & normalized\_AINI & 2024--2025 & 0.29 &  & 4.32* & 0.074 \\
+AVGO & normalized\_AINI & 2024--2025 & 0.24 & 0.18 & 2.41* & 0.096 \\
+AVGO & EMA\_02 & 2024--2025 & 0.89 &  & 4.87* & 0.074 \\
+AVGO & EMA\_02 & 2024--2025 & 0.90 & -0.02 & 2.69* & 0.091 \\
+AVGO & EMA\_08 & 2024--2025 & 0.45 &  & 4.04* & 0.074 \\
+AVGO & EMA\_08 & 2024--2025 & 0.38 & 0.16 & 2.34* & 0.096 \\
+AVGO & normalized\_AINI\_growth & 2024--2025 & -0.34 &  & 5.74* & 0.074 \\
+AVGO & normalized\_AINI\_growth & 2024--2025 & -0.39 & -0.13 & 3.37* & 0.074 \\
+IRBO & normalized\_AINI\_growth & 2024--2025 & -0.34 &  & 6.10* & 0.074 \\
+IRBO & normalized\_AINI\_growth & 2024--2025 & -0.39 & -0.13 & 4.00* & 0.074 \\
+ROBO & normalized\_AINI & 2024 & 0.28 &  & 5.30* & 0.074 \\
+ROBO & normalized\_AINI & 2024 & 0.22 & 0.20 & 2.95* & 0.080 \\
+ROBO & EMA\_02 & 2024 & 0.88 &  & 4.64* & 0.074 \\
+ROBO & EMA\_02 & 2024 & 0.86 & 0.03 & 2.71* & 0.080 \\
+ROBO & EMA\_08 & 2024 & 0.43 &  & 5.31* & 0.074 \\
+ROBO & EMA\_08 & 2024 & 0.35 & 0.18 & 3.12* & 0.080 \\
+ROBO & normalized\_AINI\_growth & 2024 & -0.33 &  & 3.31* & 0.080 \\
+\bottomrule
+\end{tabular}
+
+}
+\vspace{0.2cm}
+\textit{Note:} \textbf{***} p$<$0.01, \textbf{**} p$<$0.05, \textbf{*} p$<$0.1
+\end{table}
