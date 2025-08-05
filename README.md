@@ -122,6 +122,7 @@ AI_narrative_index/
 │   │   └── construct_AINI_variables.py         # Build daily AINI index with normalization, EMA, growth etc.
 │   │
 │   ├── visualizations/
+│   │   ├── construct_latex_tables.py           # Construct latex tables for final thesis
 │   │   └── plot_granger_causality.py           # Visualize Granger causality outputs
 │   │  
 │   ├── databases/
@@ -156,6 +157,7 @@ AI_narrative_index/
 │       ├── compare_classification_vars.ipynb  # Benchmarks different classification methods
 │       ├── visualize_ksg.ipynb                # Explain the Kraskov estimator for entropy
 │       ├── label_with_gpt.ipynb               # Annotate articles with GPT
+│       ├── construct_latex_tables.ipynb       # Construct latex tables for final thesis
 │       └── visualize_aini_variables.ipynb     # Explore AINI index trends and dynamics
 │
 ├── data/
