@@ -186,6 +186,10 @@ def build_diagnostics_table(df, w, direction, caption, label):
         "2023_24_25": "2023--2025"
     })
 
+       display_df["Ticker"] = display_df["Ticker"].replace({
+        "TSM": "TSMC"
+    })
+
     inner_table = display_df.to_latex(
         index=False,
         caption='',
@@ -193,6 +197,8 @@ def build_diagnostics_table(df, w, direction, caption, label):
         column_format="l l l r r r r r r r",
         escape=False
     )
+  
+    latex_note = "\\vspace{0.2cm}\n\\textit{Note:} \\textbf{***} p$<$0.01, \\textbf{**} p$<$0.05, \\textbf{*} p$<$0.1"
 
     latex_table = f"""\\begin{{table}}[H]
 \\normalsize
@@ -202,6 +208,7 @@ def build_diagnostics_table(df, w, direction, caption, label):
 \\resizebox{{\\textwidth}}{{!}}{{
 {inner_table}
 }}
+{latex_note}
 \\end{{table}}"""
 
     tex_filename = output_path / f"diag_gc_w{w}_{direction}.tex"
