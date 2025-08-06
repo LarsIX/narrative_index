@@ -95,12 +95,13 @@ def _wald_F_for_zero_coefs(res, target_cols: List[str]) -> Tuple[float, float, i
         if name not in exog_names:
             raise ValueError(f"Column '{name}' not in model exog.")
         R[i, exog_names.index(name)] = 1.0
-    w = res.wald_test(R, use_f=True)
-    F_stat = float(np.asarray(w.fvalue).squeeze())
-    p_value = float(np.asarray(w.pvalue).squeeze())
-    df_num = int(np.asarray(w.df_num).squeeze())
-    df_den = int(np.asarray(w.df_denom).squeeze())
+    w = res.wald_test(R, use_f=True, scalar=True)  # <-- Fix here
+    F_stat = float(w.fvalue)
+    p_value = float(w.pvalue)
+    df_num = int(w.df_num)
+    df_den = int(w.df_denom)
     return F_stat, p_value, df_num, df_den
+
 
 
 def _moving_block_indices(n: int, block_size: int, rng: np.random.Generator) -> np.ndarray:
@@ -147,6 +148,7 @@ def _gc_bootstrap_null(
         Number of valid bootstrap statistics used.
     """
     rng = default_rng(seed)
+
 
     # 1) Fit Restricted (cov choice irrelevant here)
     res_R = sm.OLS(y, _add_const(X_restricted)).fit()
@@ -198,7 +200,7 @@ def _auto_hac_lags(T: int) -> int:
 
 def run_gc_mbboot_fdr(
     aini_df: pd.DataFrame,
-    fin_data_by_year: Dict[str, pd.DataFrame],
+    fin_data: pd.DataFrame,
     version: str,
     aini_variants: Optional[List[str]] = None,
     p_ret: int = 1,
@@ -224,8 +226,8 @@ def run_gc_mbboot_fdr(
     ----------
     aini_df : pandas.DataFrame
         Must contain 'date' and one or more AINI variant columns.
-    fin_data_by_year : dict[str, pandas.DataFrame]
-        Mapping year -> DataFrame with columns ['date','Ticker','LogReturn'].
+    fin_data : pandas.DataFrame
+       Contains financial data. Must contain Ticker, Date and closing_.
     version : str
         Suffix used in the output csv filename.
     aini_variants : list of str, optional
@@ -271,7 +273,46 @@ def run_gc_mbboot_fdr(
     if aini_variants is None:
         aini_variants = ["normalized_AINI", "EMA_02", "EMA_08", "normalized_AINI_growth"]
 
-    # Ensure datetime
+    # load financial data
+    fin_data['Date'] = pd.to_datetime(fin_data['Date'])
+
+    # ensure sorting
+    fin_data['Date'] = pd.to_datetime(fin_data['Date'])
+    fin_data = fin_data.sort_values(['Ticker', 'Date'])
+
+    # Calculate log returns by Ticker
+    fin_data['log_return'] = fin_data.groupby('Ticker')['Adj Close'].transform(lambda x: np.log(x) - np.log(x.shift(1)))
+    fin_data = fin_data.dropna(subset=['log_return'])
+
+    
+    # Ensure columns are datetime
+    fin_data['date'] = pd.to_datetime(fin_data['Date'])
+
+    # Define thresholds
+    threshold_23 = pd.Timestamp('2023-12-31')
+    threshold_24 = pd.Timestamp('2024-01-01')
+    threshold_25 = pd.Timestamp('2025-01-01')
+
+    # Filter data by year
+    fin_data_23 = fin_data[fin_data['date'] < threshold_24]
+    fin_data_24 = fin_data[(fin_data['date'] > threshold_23) & (fin_data['date'] < threshold_25)]
+    fin_data_25 = fin_data[fin_data['date'] >= threshold_25]
+
+    # overlapping
+    fin_data_23_24 = fin_data[fin_data['date'] <= threshold_25]
+    fin_data_24_25 = fin_data[fin_data['date'] > threshold_23]
+    fin_data_23_24
+
+    fin_data_by_year = {
+        2023: fin_data_23,
+        2024: fin_data_24,
+        2025: fin_data_25,
+        "2023_24": fin_data_23_24,
+        "2024_25": fin_data_24_25,
+        "2023_24_25": fin_data  
+    }
+
+    # Ensure datetime in aini data
     aini = aini_df.copy()
     aini["date"] = pd.to_datetime(aini["date"])
 
