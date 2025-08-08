@@ -125,12 +125,15 @@ def run_sameday_ols_mbboot_fdr(
     aini = aini_df.copy()
     aini["date"] = pd.to_datetime(aini["date"])
     rows = []
-    master_rng = default_rng(seed)
+    master_rng = default_rng(seed) # like np.RandomState, but more flexible
 
     for year, fin in fin_data_by_year.items():
         f = fin.copy()
         f["date"] = pd.to_datetime(f["date"])
-        f = f.rename(columns={"Ticker": "ticker", "LogReturn": "log_return"})
+        # Calculate log returns by Ticker
+        f['log_return'] = f.groupby('Ticker')['Adj Close'].transform(lambda x: np.log(x) - np.log(x.shift(1)))
+        f = f.dropna(subset=['log_return'])
+        f = f.rename(columns={"Ticker": "ticker"})
         f = f.sort_values(["ticker", "date"])
         f["ret_lag1"] = f.groupby("ticker")["log_return"].shift(1)
 
@@ -273,6 +276,7 @@ def run_sameday_ols_mbboot_fdr(
         corrected.append(g)
 
     out = pd.concat(corrected, ignore_index=True).sort_values(["Year", "Ticker", "AINI_variant"])
+    outname = "ols_sameday_mbboot_fdr_controlled.csv" if control_vars else outname 
 
     if save_csv:
         if outdir is None:
