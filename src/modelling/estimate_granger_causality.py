@@ -66,8 +66,7 @@ def _fit_ols(
     statsmodels.regression.linear_model.RegressionResultsWrapper
     """
     if cov.upper() == "HAC":
-        return sm.OLS(y, _add_const(X)).fit(cov_type="HAC",
-                                            cov_kwds={"maxlags": hac_lags or 1})
+        return sm.OLS(y, _add_const(X)).fit(cov_type="HAC",cov_kwds={"maxlags": hac_lags or 1})                            
     return sm.OLS(y, _add_const(X)).fit(cov_type="HC3")
 
 
@@ -89,13 +88,13 @@ def _wald_F_for_zero_coefs(res, target_cols: List[str]) -> Tuple[float, float, i
     HC3/HAC-robust Wald test (F-form) for joint zero restrictions on target_cols.
     """
     exog_names = res.model.exog_names
-    k = len(target_cols)
+    k = len(target_cols) # e.g. len(['AINI_lag1', 'AINI_lag2', 'AINI_lag3'])
     R = np.zeros((k, len(exog_names)))
     for i, name in enumerate(target_cols):
         if name not in exog_names:
             raise ValueError(f"Column '{name}' not in model exog.")
         R[i, exog_names.index(name)] = 1.0
-    w = res.wald_test(R, use_f=True, scalar=True)  # <-- Fix here
+    w = res.wald_test(R, use_f=True, scalar=True)  
     F_stat = float(w.fvalue)
     p_value = float(w.pvalue)
     df_num = int(w.df_num)
@@ -150,7 +149,7 @@ def _gc_bootstrap_null(
     rng = default_rng(seed)
 
 
-    # 1) Fit Restricted (cov choice irrelevant here)
+    # 1) Fit Restricted 
     res_R = sm.OLS(y, _add_const(X_restricted)).fit()
     yhat_R = res_R.fittedvalues
     ehat_R = y - yhat_R
@@ -518,3 +517,4 @@ def run_gc_mbboot_fdr(
         out.to_csv(outdir / outname, index=False)
 
     return out
+

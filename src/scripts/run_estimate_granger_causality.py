@@ -64,7 +64,6 @@ def infer_aini_file_from_version(version: str) -> Path:
     fname = f"{version}_AINI_variables.csv"
     return base / fname
 
-
 # ---------- CLI ----------
 @app.command()
 def run(
@@ -173,6 +172,44 @@ def run(
 
     typer.echo("[DONE] Granger causality estimation finished.")
     
+@app.command("run-all-versions")
+def run_all_versions(
+    versions: List[str] = typer.Option(["w0", "w1", "w2"], help="Which versions to run."),
+    p_ret: int = 1,
+    p_x_range: str = "1,3",
+    n_boot: int = 5000,
+    block_size: int = 5,
+    fdr_alpha: float = 0.10,
+    min_obs: int = 0,
+    cov_for_analytic: str = "HAC",
+    hac_lags: Optional[int] = None,
+    aini_variants: Optional[str] = None,
+    outdir: Optional[Path] = None,
+    seed: int = 42,
+):
+    """
+    Run Granger causality estimation for multiple AINI versions in sequence.
+    """
+    for v in versions:
+        typer.echo(f"\n[=== Running version: {v} ===]")
+        run(
+            version=v,
+            fin_data_dir=None,
+            aini_file=None,
+            p_ret=p_ret,
+            p_x=3,  # will be overridden by p_x_range
+            p_x_range=p_x_range,
+            n_boot=n_boot,
+            block_size=block_size,
+            fdr_alpha=fdr_alpha,
+            min_obs=min_obs,
+            cov_for_analytic=cov_for_analytic,
+            hac_lags=hac_lags,
+            aini_variants=aini_variants,
+            outdir=outdir,
+            seed=seed,
+        )
 
+# CLI entry point
 if __name__ == "__main__":
     app()
