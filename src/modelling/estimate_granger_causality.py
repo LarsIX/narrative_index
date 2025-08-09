@@ -1,33 +1,39 @@
 """
 Granger Causality (both directions) with HC3/HAC covariance, null-imposing
-Moving Block Bootstrap p-values, and Benjamini–Hochberg FDR.
+Moving Block Bootstrap p-values, and Benjamini–Hochberg FDR — with parallelization.
+
+Enhancements
+------------
+- Parallel estimation across (ticker, variant) jobs using joblib.
+- On-the-fly per-(ticker, year) z-scores for `normalized_AINI` -> `normalized_AINI_z`
+  (only if std > 0); included as an extra AINI variant automatically.
 
 For each (Ticker, Year) and each AINI variant, test:
   1) AINI lags Granger-cause returns:      AINI → Return
   2) Return lags Granger-cause AINI:       Return → AINI
 
 Per direction:
-- Compute an analytic HC3/HAC Wald/F p-value for joint significance of the
-  *causal* lags.
-- Compute a null-imposing empirical p-value via Moving Block Bootstrap (MBB).
-- Apply BH-FDR within (Ticker, Year, Direction).
+- Analytic HC3/HAC Wald-F p-value (joint significance of causal lags)
+- Null-imposing empirical p-value via residual Moving Block Bootstrap (MBB)
+- BH-FDR within (Ticker, Year, Direction)
 
 Returns one row per (Ticker, Year, AINI_variant, Direction) with:
 - F-statistic, df, analytic p, bootstrap p
-- FDR-corrected p-values (both analytic and bootstrap)
+- FDR-corrected p-values (analytic + bootstrap)
 - Model fit stats for the unrestricted model
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Iterable
 
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from numpy.random import default_rng
 from statsmodels.stats.multitest import multipletests
+from joblib import Parallel, delayed
 
 
 # ---------------------------------------------------------------------
@@ -35,9 +41,7 @@ from statsmodels.stats.multitest import multipletests
 # ---------------------------------------------------------------------
 
 def _add_const(X: pd.DataFrame) -> pd.DataFrame:
-    """
-    Add an intercept column named ``const`` to a design matrix (idempotent).
-    """
+    """Add an intercept column named ``const`` """
     return sm.add_constant(X, has_constant="add")
 
 
@@ -66,14 +70,12 @@ def _fit_ols(
     statsmodels.regression.linear_model.RegressionResultsWrapper
     """
     if cov.upper() == "HAC":
-        return sm.OLS(y, _add_const(X)).fit(cov_type="HAC",cov_kwds={"maxlags": hac_lags or 1})                            
+        return sm.OLS(y, _add_const(X)).fit(cov_type="HAC", cov_kwds={"maxlags": hac_lags or 1})
     return sm.OLS(y, _add_const(X)).fit(cov_type="HC3")
 
 
 def _lag(df: pd.DataFrame, col: str, lags: int, prefix: Optional[str] = None) -> pd.DataFrame:
-    """
-    Create lagged columns for ``col`` with names ``{prefix}_lag1..lags``.
-    """
+    """Create lagged columns for ``col`` with names ``{prefix}_lag1..lags``."""
     if lags < 1:
         return df
     base = col if prefix is None else prefix
@@ -84,17 +86,15 @@ def _lag(df: pd.DataFrame, col: str, lags: int, prefix: Optional[str] = None) ->
 
 
 def _wald_F_for_zero_coefs(res, target_cols: List[str]) -> Tuple[float, float, int, int]:
-    """
-    HC3/HAC-robust Wald test (F-form) for joint zero restrictions on target_cols.
-    """
+    """HC3/HAC-robust Wald F-test for joint zero restrictions on target_cols."""
     exog_names = res.model.exog_names
-    k = len(target_cols) # e.g. len(['AINI_lag1', 'AINI_lag2', 'AINI_lag3'])
+    k = len(target_cols)
     R = np.zeros((k, len(exog_names)))
     for i, name in enumerate(target_cols):
         if name not in exog_names:
             raise ValueError(f"Column '{name}' not in model exog.")
         R[i, exog_names.index(name)] = 1.0
-    w = res.wald_test(R, use_f=True, scalar=True)  
+    w = res.wald_test(R, use_f=True, scalar=True)
     F_stat = float(w.fvalue)
     p_value = float(w.pvalue)
     df_num = int(w.df_num)
@@ -102,11 +102,8 @@ def _wald_F_for_zero_coefs(res, target_cols: List[str]) -> Tuple[float, float, i
     return F_stat, p_value, df_num, df_den
 
 
-
 def _moving_block_indices(n: int, block_size: int, rng: np.random.Generator) -> np.ndarray:
-    """
-    Generate indices for Moving Block Bootstrap (overlapping blocks).
-    """
+    """Generate indices for Moving Block Bootstrap (overlapping blocks)."""
     if block_size < 1 or block_size > n:
         raise ValueError("block_size must be in [1, n]")
     n_blocks = int(np.ceil(n / block_size))
@@ -138,27 +135,16 @@ def _gc_bootstrap_null(
        - y_b = yhat_R + e_b  (simulation under H0)
        - Fit U on (y_b, XU_b) and record F_b.
     4) p = (#{F_b >= F_obs}+1)/(B_valid+1)
-
-    Returns
-    -------
-    p_value : float
-        Empirical right-tailed p-value.
-    n_valid : int
-        Number of valid bootstrap statistics used.
     """
     rng = default_rng(seed)
 
-
-    # 1) Fit Restricted 
     res_R = sm.OLS(y, _add_const(X_restricted)).fit()
     yhat_R = res_R.fittedvalues
     ehat_R = y - yhat_R
 
-    # 2) Observed F from Unrestricted with chosen covariance
     res_U = _fit_ols(y, X_unrestricted, cov=cov, hac_lags=hac_lags)
     F_obs, _, _, _ = _wald_F_for_zero_coefs(res_U, tested_cols)
 
-    # 3) Bootstrap under H0
     F_boot: List[float] = []
     n = len(y)
     for _ in range(n_boot):
@@ -173,7 +159,6 @@ def _gc_bootstrap_null(
             if np.isfinite(F_b):
                 F_boot.append(float(F_b))
         except Exception:
-            # Skip failed draws (singularity etc.)
             continue
 
     F_boot = np.asarray(F_boot, dtype=float)
@@ -187,10 +172,167 @@ def _gc_bootstrap_null(
 
 
 def _auto_hac_lags(T: int) -> int:
-    """
-    Newey–West rule-of-thumb for HAC maxlags: floor(4*(T/100)^(2/9)).
-    """
+    """Newey–West rule-of-thumb for HAC maxlags: floor(4*(T/100)^(2/9))."""
     return int(np.floor(4 * (T / 100.0) ** (2.0 / 9.0)))
+
+
+# -------------------------
+# Parallel job per (ticker, variant)
+# -------------------------
+
+def _process_ticker_variant(
+    d: pd.DataFrame,
+    ticker: str,
+    year_key,
+    var: str,
+    p_ret: int,
+    p_x: int,
+    min_obs: int,
+    block_size: int,
+    n_boot: int,
+    base_seed: int,
+    cov_for_analytic: str,
+    hac_lags: Optional[int],
+) -> List[Dict]:
+    """
+    Run both directions for a single (ticker, variant) slice and return row dicts.
+    """
+    out_rows: List[Dict] = []
+
+    # Build return lags once
+    df_lagged = _lag(d, "log_return", p_ret, prefix="ret")
+
+    # Build AINI lags
+    df_v = _lag(df_lagged, var, p_x, prefix=var)
+
+    ret_lag_cols = [f"ret_lag{i}" for i in range(1, p_ret + 1)]
+    xlag_cols = [f"{var}_lag{i}" for i in range(1, p_x + 1)]
+
+    # Direction: AINI → Return
+    y_r = df_v["log_return"]
+    XR = df_v[ret_lag_cols]
+    XU = df_v[ret_lag_cols + xlag_cols]
+    sub_r = pd.concat([y_r, XU], axis=1).dropna()
+
+    if len(sub_r) >= min_obs and (1 + len(ret_lag_cols) + len(xlag_cols)) < len(sub_r):
+        y_sub = sub_r["log_return"]
+        XR_sub = sub_r[ret_lag_cols]
+        XU_sub = sub_r[ret_lag_cols + xlag_cols]
+
+        use_hac = (cov_for_analytic.upper() == "HAC")
+        _hac_lags = (hac_lags if use_hac and hac_lags is not None
+                     else (_auto_hac_lags(len(sub_r)) if use_hac else None))
+        try:
+            res_u = _fit_ols(y_sub, XU_sub,
+                             cov=("HAC" if use_hac else "HC3"),
+                             hac_lags=_hac_lags)
+            F_stat, p_analytic, df_num, df_den = _wald_F_for_zero_coefs(res_u, xlag_cols)
+        except Exception:
+            res_u = None
+            F_stat, p_analytic = np.nan, np.nan
+            df_num = len(xlag_cols)
+            df_den = max(1, len(sub_r) - (1 + len(ret_lag_cols) + len(xlag_cols)))
+
+        seed = int((abs(hash((str(year_key), str(ticker), var, "A2R"))) % (2**31 - 1)) + base_seed)
+        try:
+            p_boot, n_valid = _gc_bootstrap_null(
+                y=y_sub,
+                X_restricted=XR_sub,
+                X_unrestricted=XU_sub,
+                tested_cols=xlag_cols,
+                n_boot=n_boot,
+                block_size=block_size,
+                seed=seed,
+                cov=("HAC" if use_hac else "HC3"),
+                hac_lags=_hac_lags,
+            )
+        except Exception:
+            p_boot, n_valid = np.nan, 0
+
+        out_rows.append({
+            "Ticker": ticker,
+            "AINI_variant": var,
+            "Year": year_key,
+            "Direction": "AINI_to_RET",
+            "p_ret": p_ret,
+            "p_x": p_x,
+            "N_obs": len(sub_r),
+            "block_size": block_size,
+            "N_boot": n_boot,
+            "N_boot_valid": n_valid,
+            "F_stat": F_stat,
+            "df_num": df_num,
+            "df_den": df_den,
+            "Original_F_pval": p_analytic,
+            "Empirical_F_pval": p_boot,
+            "r2_u": getattr(res_u, "rsquared", np.nan),
+            "adj_r2_u": getattr(res_u, "rsquared_adj", np.nan),
+        })
+
+    # Direction: Return → AINI
+    y_x = df_v[var]
+    XR2 = df_v[xlag_cols] if xlag_cols else pd.DataFrame(index=df_v.index)
+    XU2 = pd.concat([XR2, df_v[ret_lag_cols]], axis=1) if ret_lag_cols else XR2
+    sub_x = pd.concat([y_x, XU2], axis=1).dropna()
+
+    if len(sub_x) >= min_obs and (1 + len(xlag_cols) + len(ret_lag_cols)) < len(sub_x):
+        y_sub = sub_x[var]
+        XR_sub = sub_x[xlag_cols] if xlag_cols else pd.DataFrame(index=sub_x.index)
+        if XR_sub.shape[1] == 0:
+            XR_sub = pd.DataFrame({"_zero": np.zeros(len(sub_x), dtype=float)}, index=sub_x.index)
+        XU_sub = sub_x[(xlag_cols if xlag_cols else []) + ret_lag_cols]
+
+        use_hac = (cov_for_analytic.upper() == "HAC")
+        _hac_lags = (hac_lags if use_hac and hac_lags is not None
+                     else (_auto_hac_lags(len(sub_x)) if use_hac else None))
+        try:
+            res_u = _fit_ols(y_sub, XU_sub,
+                             cov=("HAC" if use_hac else "HC3"),
+                             hac_lags=_hac_lags)
+            F_stat, p_analytic, df_num, df_den = _wald_F_for_zero_coefs(res_u, ret_lag_cols)
+        except Exception:
+            res_u = None
+            F_stat, p_analytic = np.nan, np.nan
+            df_num = len(ret_lag_cols)
+            df_den = max(1, len(sub_x) - (1 + len(xlag_cols) + len(ret_lag_cols)))
+
+        seed = int((abs(hash((str(year_key), str(ticker), var, "R2A"))) % (2**31 - 1)) + base_seed)
+        try:
+            p_boot, n_valid = _gc_bootstrap_null(
+                y=y_sub,
+                X_restricted=XR_sub,
+                X_unrestricted=XU_sub,
+                tested_cols=ret_lag_cols,
+                n_boot=n_boot,
+                block_size=block_size,
+                seed=seed,
+                cov=("HAC" if use_hac else "HC3"),
+                hac_lags=_hac_lags,
+            )
+        except Exception:
+            p_boot, n_valid = np.nan, 0
+
+        out_rows.append({
+            "Ticker": ticker,
+            "AINI_variant": var,
+            "Year": year_key,
+            "Direction": "RET_to_AINI",
+            "p_ret": p_ret,
+            "p_x": p_x,
+            "N_obs": len(sub_x),
+            "block_size": block_size,
+            "N_boot": n_boot,
+            "N_boot_valid": n_valid,
+            "F_stat": F_stat,
+            "df_num": df_num,
+            "df_den": df_den,
+            "Original_F_pval": p_analytic,
+            "Empirical_F_pval": p_boot,
+            "r2_u": getattr(res_u, "rsquared", np.nan),
+            "adj_r2_u": getattr(res_u, "rsquared_adj", np.nan),
+        })
+
+    return out_rows
 
 
 # ---------------------------------------------------------------------
@@ -214,93 +356,47 @@ def run_gc_mbboot_fdr(
     save_csv: bool = True,
     outdir: Optional[Path] = None,
     outname: Optional[str] = None,     # If None -> f"granger_causality_{version}.csv"
+    n_jobs: int = -1,                  # parallel workers (joblib)
 ) -> pd.DataFrame:
     """
     Granger causality (AINI→Return and Return→AINI) with:
       - Analytic Wald/F p-values (HC3 or HAC)
       - Null-imposing MBB empirical p-values
       - Benjamini–Hochberg FDR per (Ticker, Year, Direction)
+      - Parallel estimation across (ticker, variant) jobs
 
-    Parameters
-    ----------
-    aini_df : pandas.DataFrame
-        Must contain 'date' and one or more AINI variant columns.
-    fin_data : pandas.DataFrame
-       Contains financial data. Must contain Ticker, Date and closing_.
-    version : str
-        Suffix used in the output csv filename.
-    aini_variants : list of str, optional
-        AINI columns to test. Default: ['normalized_AINI','EMA_02','EMA_08','normalized_AINI_growth'].
-    p_ret : int
-        Return lags used in both directions.
-    p_x : int
-        AINI lags used in both directions.
-    min_obs : int
-        Minimum complete cases after lag construction.
-    block_size : int
-        Block size for MBB.
-    n_boot : int
-        Number of bootstrap replications.
-    seed : int
-        RNG seed.
-    fdr_alpha : float
-        BH-FDR level (applied within each (Ticker, Year, Direction)).
-    cov_for_analytic : {"HAC","HC3"}
-        Covariance for analytic Wald test p-values. HAC recommended for time series.
-    hac_lags : int or None
-        HAC maxlags. If None and cov_for_analytic=="HAC", uses NW rule.
-    save_csv : bool
-        If True, save results to CSV.
-    outdir : pathlib.Path or None
-        Output directory; if None, defaults to <repo>/data/processed/variables or CWD.
-    outname : str or None
-        Filename. If None: "granger_causality_{version}.csv". (Convention preserved.)
+    Also computes per-(ticker, year) z-scores for `normalized_AINI` → `normalized_AINI_z`
+    and includes it as an additional tested variant (only if std>0).
 
-    Returns
-    -------
-    pandas.DataFrame
-        Rows per (Ticker, Year, AINI_variant, Direction) with:
-        - Direction ∈ {"AINI_to_RET","RET_to_AINI"}
-        - p_ret, p_x, N_obs, block_size, N_boot, N_boot_valid
-        - F_stat, df_num, df_den
-        - Original_F_pval (analytic, HC3/HAC)
-        - Empirical_F_pval (null-imposing MBB)
-        - BH_corr_F_pval, BH_reject_F          (FDR on Empirical_F_pval)
-        - BH_corr_F_pval_HC3, BH_reject_F_HC3  (FDR on Original_F_pval)
-        - r2_u, adj_r2_u  (unrestricted model fit)
+    Defaults
+    --------
+    aini_variants: ["normalized_AINI", "EMA_02", "EMA_08"]
     """
     if aini_variants is None:
-        aini_variants = ["normalized_AINI", "EMA_02", "EMA_08", "normalized_AINI_growth"]
+        aini_variants = ["normalized_AINI", "EMA_02", "EMA_08"]
 
-    # load financial data
-    fin_data['Date'] = pd.to_datetime(fin_data['Date'])
+    # --- Financial data prep ---
+    fin_data = fin_data.copy()
+    fin_data["Date"] = pd.to_datetime(fin_data["Date"])
+    fin_data = fin_data.sort_values(["Ticker", "Date"])
 
-    # ensure sorting
-    fin_data['Date'] = pd.to_datetime(fin_data['Date'])
-    fin_data = fin_data.sort_values(['Ticker', 'Date'])
+    fin_data["log_return"] = fin_data.groupby("Ticker")["Adj Close"].transform(
+        lambda x: np.log(x) - np.log(x.shift(1))
+    )
+    fin_data = fin_data.dropna(subset=["log_return"])
+    fin_data["date"] = pd.to_datetime(fin_data["Date"])
 
-    # Calculate log returns by Ticker
-    fin_data['log_return'] = fin_data.groupby('Ticker')['Adj Close'].transform(lambda x: np.log(x) - np.log(x.shift(1)))
-    fin_data = fin_data.dropna(subset=['log_return'])
+    # Year splits (including overlaps as in your baseline)
+    threshold_23 = pd.Timestamp("2023-12-31")
+    threshold_24 = pd.Timestamp("2024-01-01")
+    threshold_25 = pd.Timestamp("2025-01-01")
 
-    
-    # Ensure columns are datetime
-    fin_data['date'] = pd.to_datetime(fin_data['Date'])
+    fin_data_23 = fin_data[fin_data["date"] < threshold_24]
+    fin_data_24 = fin_data[(fin_data["date"] > threshold_23) & (fin_data["date"] < threshold_25)]
+    fin_data_25 = fin_data[fin_data["date"] >= threshold_25]
 
-    # Define thresholds
-    threshold_23 = pd.Timestamp('2023-12-31')
-    threshold_24 = pd.Timestamp('2024-01-01')
-    threshold_25 = pd.Timestamp('2025-01-01')
-
-    # Filter data by year
-    fin_data_23 = fin_data[fin_data['date'] < threshold_24]
-    fin_data_24 = fin_data[(fin_data['date'] > threshold_23) & (fin_data['date'] < threshold_25)]
-    fin_data_25 = fin_data[fin_data['date'] >= threshold_25]
-
-    # overlapping
-    fin_data_23_24 = fin_data[fin_data['date'] <= threshold_25]
-    fin_data_24_25 = fin_data[fin_data['date'] > threshold_23]
-    fin_data_23_24
+    fin_data_23_24 = fin_data[fin_data["date"] <= threshold_25]
+    fin_data_24_25 = fin_data[fin_data["date"] > threshold_23]
 
     fin_data_by_year = {
         2023: fin_data_23,
@@ -308,205 +404,113 @@ def run_gc_mbboot_fdr(
         2025: fin_data_25,
         "2023_24": fin_data_23_24,
         "2024_25": fin_data_24_25,
-        "2023_24_25": fin_data  
+        "2023_24_25": fin_data,
     }
 
-    # Ensure datetime in aini data
+    # --- AINI data prep ---
     aini = aini_df.copy()
     aini["date"] = pd.to_datetime(aini["date"])
 
-    rows = []
-    rng = default_rng(seed)
+    all_rows: List[Dict] = []
+    base_seed = int(seed)
 
-    for year, fin in fin_data_by_year.items():
+    # Iterate year partitions
+    for year_key, fin in fin_data_by_year.items():
         f = fin.copy()
         f["date"] = pd.to_datetime(f["date"])
         f = f.rename(columns={"Ticker": "ticker", "LogReturn": "log_return"})
         f = f.sort_values(["ticker", "date"])
 
-        # Merge contemporaneous AINI (lags built after, within ticker)
+        # Merge contemporaneous AINI columns
         merged = pd.merge(f, aini[["date"] + aini_variants], on="date", how="left")
+
+        # Build per-ticker tasks
+        tasks: List[Tuple[pd.DataFrame, str, object, str]] = []
 
         for ticker, d in merged.groupby("ticker"):
             d = d.sort_values("date").reset_index(drop=True)
 
-            # Build return lags once
-            df_lagged = _lag(d, "log_return", p_ret, prefix="ret")
+            # On-the-fly z for normalized_AINI
+            eff_variants = list(aini_variants)  # shallow copy
+            if "normalized_AINI" in d.columns:
+                s = pd.to_numeric(d["normalized_AINI"], errors="coerce")
+                mu = s.mean(skipna=True)
+                sd = s.std(skipna=True)
+                if pd.notna(sd) and float(sd) > 0.0:
+                    d = d.copy()
+                    d["normalized_AINI_z"] = (s - mu) / (sd if sd > 1e-12 else 1e-12)
+                    eff_variants.append("normalized_AINI_z")
 
-            for var in aini_variants:
-                # Build AINI lags
-                df_v = _lag(df_lagged, var, p_x, prefix=var)
+            # Create one job per (ticker, variant)
+            for var in eff_variants:
+                # Skip if column missing (robust to user-supplied lists)
+                if var not in d.columns:
+                    continue
+                tasks.append((d, str(ticker), year_key, var))
 
-                ret_lag_cols = [f"ret_lag{i}" for i in range(1, p_ret + 1)]
-                xlag_cols = [f"{var}_lag{i}" for i in range(1, p_x + 1)]
+        # Run tasks in parallel for this year partition
+        results_nested: List[List[Dict]] = Parallel(n_jobs=n_jobs, backend="loky", batch_size="auto")(
+            delayed(_process_ticker_variant)(
+                d=td,
+                ticker=tkr,
+                year_key=yrk,
+                var=vr,
+                p_ret=p_ret,
+                p_x=p_x,
+                min_obs=min_obs,
+                block_size=block_size,
+                n_boot=n_boot,
+                base_seed=base_seed,
+                cov_for_analytic=cov_for_analytic,
+                hac_lags=hac_lags,
+            )
+            for (td, tkr, yrk, vr) in tasks
+        )
 
-                # --------------------------
-                # Direction: AINI → Return
-                # --------------------------
-                y_r = df_v["log_return"]
-                XR = df_v[ret_lag_cols]
-                XU = df_v[ret_lag_cols + xlag_cols]
-                sub_r = pd.concat([y_r, XU], axis=1).dropna()
+        # Flatten and collect
+        for rows in results_nested:
+            all_rows.extend(rows)
 
-                # Guard: enough obs and df
-                if len(sub_r) >= min_obs and (1 + len(ret_lag_cols) + len(xlag_cols)) < len(sub_r):
-                    y_sub = sub_r["log_return"]
-                    XR_sub = sub_r[ret_lag_cols]
-                    XU_sub = sub_r[ret_lag_cols + xlag_cols]
-
-                    # Analytic (HC3/HAC)
-                    use_hac = (cov_for_analytic.upper() == "HAC")
-                    _hac_lags = (hac_lags if use_hac and hac_lags is not None
-                                 else (_auto_hac_lags(len(sub_r)) if use_hac else None))
-                    try:
-                        res_u = _fit_ols(y_sub, XU_sub,
-                                         cov=("HAC" if use_hac else "HC3"),
-                                         hac_lags=_hac_lags)
-                        F_stat, p_analytic, df_num, df_den = _wald_F_for_zero_coefs(res_u, xlag_cols)
-                    except Exception:
-                        res_u = None
-                        F_stat, p_analytic = np.nan, np.nan
-                        df_num = len(xlag_cols)
-                        df_den = max(1, len(sub_r) - (1 + len(ret_lag_cols) + len(xlag_cols)))
-
-                    # Null-imposing MBB p
-                    try:
-                        p_boot, n_valid = _gc_bootstrap_null(
-                            y=y_sub,
-                            X_restricted=XR_sub,
-                            X_unrestricted=XU_sub,
-                            tested_cols=xlag_cols,
-                            n_boot=n_boot,
-                            block_size=block_size,
-                            seed=int(rng.integers(0, 2**31 - 1)),
-                            cov=("HAC" if use_hac else "HC3"),
-                            hac_lags=_hac_lags,
-                        )
-                    except Exception:
-                        p_boot, n_valid = np.nan, 0
-
-                    rows.append({
-                        "Ticker": ticker,
-                        "AINI_variant": var,
-                        "Year": year,
-                        "Direction": "AINI_to_RET",
-                        "p_ret": p_ret,
-                        "p_x": p_x,
-                        "N_obs": len(sub_r),
-                        "block_size": block_size,
-                        "N_boot": n_boot,
-                        "N_boot_valid": n_valid,
-                        "F_stat": F_stat,
-                        "df_num": df_num,
-                        "df_den": df_den,
-                        "Original_F_pval": p_analytic,
-                        "Empirical_F_pval": p_boot,
-                        "r2_u": getattr(res_u, "rsquared", np.nan),
-                        "adj_r2_u": getattr(res_u, "rsquared_adj", np.nan),
-                    })
-
-                # --------------------------
-                # Direction: Return → AINI
-                # --------------------------
-                y_x = df_v[var]
-                XR2 = df_v[xlag_cols] if xlag_cols else pd.DataFrame(index=df_v.index)
-                XU2 = pd.concat([XR2, df_v[ret_lag_cols]], axis=1) if ret_lag_cols else XR2
-                sub_x = pd.concat([y_x, XU2], axis=1).dropna()
-
-                # Guard: enough obs and df
-                if len(sub_x) >= min_obs and (1 + len(xlag_cols) + len(ret_lag_cols)) < len(sub_x):
-                    y_sub = sub_x[var]
-                    XR_sub = sub_x[xlag_cols] if xlag_cols else pd.DataFrame(index=sub_x.index)
-                    # If XR_sub is empty, add a zero column to keep shapes valid in restricted fit
-                    if XR_sub.shape[1] == 0:
-                        XR_sub = pd.DataFrame({"_zero": np.zeros(len(sub_x), dtype=float)}, index=sub_x.index)
-                    XU_sub = sub_x[(xlag_cols if xlag_cols else []) + ret_lag_cols]
-
-                    use_hac = (cov_for_analytic.upper() == "HAC")
-                    _hac_lags = (hac_lags if use_hac and hac_lags is not None
-                                 else (_auto_hac_lags(len(sub_x)) if use_hac else None))
-                    try:
-                        res_u = _fit_ols(y_sub, XU_sub,
-                                         cov=("HAC" if use_hac else "HC3"),
-                                         hac_lags=_hac_lags)
-                        F_stat, p_analytic, df_num, df_den = _wald_F_for_zero_coefs(res_u, ret_lag_cols)
-                    except Exception:
-                        res_u = None
-                        F_stat, p_analytic = np.nan, np.nan
-                        df_num = len(ret_lag_cols)
-                        df_den = max(1, len(sub_x) - (1 + len(xlag_cols) + len(ret_lag_cols)))
-
-                    try:
-                        p_boot, n_valid = _gc_bootstrap_null(
-                            y=y_sub,
-                            X_restricted=XR_sub,
-                            X_unrestricted=XU_sub,
-                            tested_cols=ret_lag_cols,
-                            n_boot=n_boot,
-                            block_size=block_size,
-                            seed=int(rng.integers(0, 2**31 - 1)),
-                            cov=("HAC" if use_hac else "HC3"),
-                            hac_lags=_hac_lags,
-                        )
-                    except Exception:
-                        p_boot, n_valid = np.nan, 0
-
-                    rows.append({
-                        "Ticker": ticker,
-                        "AINI_variant": var,
-                        "Year": year,
-                        "Direction": "RET_to_AINI",
-                        "p_ret": p_ret,
-                        "p_x": p_x,
-                        "N_obs": len(sub_x),
-                        "block_size": block_size,
-                        "N_boot": n_boot,
-                        "N_boot_valid": n_valid,
-                        "F_stat": F_stat,
-                        "df_num": df_num,
-                        "df_den": df_den,
-                        "Original_F_pval": p_analytic,
-                        "Empirical_F_pval": p_boot,
-                        "r2_u": getattr(res_u, "rsquared", np.nan),
-                        "adj_r2_u": getattr(res_u, "rsquared_adj", np.nan),
-                    })
-
-    out = pd.DataFrame(rows).sort_values(["Year", "Ticker", "AINI_variant", "Direction"])
+    out = pd.DataFrame(all_rows).sort_values(["Year", "Ticker", "AINI_variant", "Direction"])
 
     # ----- FDR per (Ticker, Year, Direction) -----
-    corrected = []
-    for (ticker, year, direction), g in out.groupby(["Ticker", "Year", "Direction"], dropna=False):
-        g = g.copy()
+    if not out.empty:
+        corrected = []
+        for (ticker, year, direction), g in out.groupby(["Ticker", "Year", "Direction"], dropna=False):
+            g = g.copy()
 
-        # FDR on Empirical_F_pval (primary)
-        p_emp = g["Empirical_F_pval"]
-        if p_emp.notna().sum() >= 2:
-            rej, p_corr = multipletests(p_emp, alpha=fdr_alpha, method="fdr_bh")[:2]
-            g["BH_reject_F"] = rej
-            g["BH_corr_F_pval"] = p_corr
-        else:
-            g["BH_reject_F"] = False
-            g["BH_corr_F_pval"] = np.nan
+            # FDR on Empirical_F_pval (primary)
+            p_emp = pd.to_numeric(g["Empirical_F_pval"], errors="coerce")
+            if p_emp.notna().sum() >= 2:
+                rej, p_corr = multipletests(p_emp, alpha=fdr_alpha, method="fdr_bh")[:2]
+                g["BH_reject_F"] = rej
+                g["BH_corr_F_pval"] = p_corr
+            else:
+                g["BH_reject_F"] = False
+                g["BH_corr_F_pval"] = np.nan
 
-        # FDR on analytic p-values (HC3/HAC)
-        p_ana = g["Original_F_pval"]
-        if p_ana.notna().sum() >= 2:
-            rej2, p_corr2 = multipletests(p_ana, alpha=fdr_alpha, method="fdr_bh")[:2]
-            g["BH_reject_F_HC3"] = rej2   # kept key name for compatibility
-            g["BH_corr_F_pval_HC3"] = p_corr2
-        else:
-            g["BH_reject_F_HC3"] = False
-            g["BH_corr_F_pval_HC3"] = np.nan
+            # FDR on analytic p-values (HC3/HAC)
+            p_ana = pd.to_numeric(g["Original_F_pval"], errors="coerce")
+            if p_ana.notna().sum() >= 2:
+                rej2, p_corr2 = multipletests(p_ana, alpha=fdr_alpha, method="fdr_bh")[:2]
+                g["BH_reject_F_HC3"] = rej2   # key kept for compatibility
+                g["BH_corr_F_pval_HC3"] = p_corr2
+            else:
+                g["BH_reject_F_HC3"] = False
+                g["BH_corr_F_pval_HC3"] = np.nan
 
-        corrected.append(g)
+            corrected.append(g)
 
-    out = pd.concat(corrected, ignore_index=True).sort_values(["Year", "Ticker", "AINI_variant", "Direction"])
+        out = pd.concat(corrected, ignore_index=True).sort_values(["Year", "Ticker", "AINI_variant", "Direction"])
 
-    # ----- Save (filename convention preserved) -----
+    # ----- Save  -----
     if outname is None:
         outname = f"granger_causality_{version}.csv"
 
     if save_csv:
+        if out.empty:
+            # Avoid writing empty files silently
+            raise ValueError("No GC rows produced. Check min_obs, variant columns, or input merges.")
         if outdir is None:
             try:
                 base = Path(__file__).resolve().parents[2]
@@ -517,4 +521,3 @@ def run_gc_mbboot_fdr(
         out.to_csv(outdir / outname, index=False)
 
     return out
-
