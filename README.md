@@ -95,8 +95,8 @@ AI_narrative_index/
 │   ├── fetch_data/
 │   │   ├── load_financial_data.py              # Download and prepare financial market data
 │   │   ├── wsj_archive_crawler.py              # Crawl WSJ archive pages to collect article URLs
-│   │   ├── wsj_archive_scraper.py              # Scrape full article content from collected WSJ URLs
-│   │   └── run_predict_AINI.py                 # Apply trained AINI model to WSJ text for predictions
+│   │   └── wsj_archive_scraper.py              # Scrape full article content from collected WSJ URLs
+│   │   
 │   │
 │   ├── preprocessing/
 │   │   ├── clean_database.py                   # Clean and filter articles by section, length, and duplicates
