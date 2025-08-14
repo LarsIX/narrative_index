@@ -1,26 +1,9 @@
 """
 Granger Causality (both directions) with HC3/HAC covariance, null-imposing
-Moving Block Bootstrap p-values, and Benjamini–Hochberg FDR — with parallelization.
+Wild Residual Bootstrap p-values, and Benjamini–Hochberg FDR — with parallelization.
 
-Enhancements
-------------
-- Parallel estimation across (ticker, variant) jobs using joblib.
-- On-the-fly per-(ticker, year) z-scores for `normalized_AINI` -> `normalized_AINI_z`
-  (only if std > 0); included as an extra AINI variant automatically.
-
-For each (Ticker, Year) and each AINI variant, test:
-  1) AINI lags Granger-cause returns:      AINI → Return
-  2) Return lags Granger-cause AINI:       Return → AINI
-
-Per direction:
-- Analytic HC3/HAC Wald-F p-value (joint significance of causal lags)
-- Null-imposing empirical p-value via residual Moving Block Bootstrap (MBB)
-- BH-FDR within (Ticker, Year, Direction)
-
-Returns one row per (Ticker, Year, AINI_variant, Direction) with:
-- F-statistic, df, analytic p, bootstrap p
-- FDR-corrected p-values (analytic + bootstrap)
-- Model fit stats for the unrestricted model
+Differences vs previous MBB version:
+- Uses WILD bootstrap on restricted residuals (Rademacher by default).
 """
 
 from __future__ import annotations
@@ -41,7 +24,7 @@ from joblib import Parallel, delayed
 # ---------------------------------------------------------------------
 
 def _add_const(X: pd.DataFrame) -> pd.DataFrame:
-    """Add an intercept column named ``const`` """
+    """Add an intercept column named ``const``."""
     return sm.add_constant(X, has_constant="add")
 
 
@@ -53,21 +36,6 @@ def _fit_ols(
 ):
     """
     Fit OLS with either HC3 or HAC covariance.
-
-    Parameters
-    ----------
-    y : pandas.Series
-        Dependent variable (aligned to X).
-    X : pandas.DataFrame
-        Regressors (no intercept required).
-    cov : {"HAC","HC3"}, default "HAC"
-        Covariance estimator for inference.
-    hac_lags : int, optional
-        Newey–West maxlags when cov="HAC".
-
-    Returns
-    -------
-    statsmodels.regression.linear_model.RegressionResultsWrapper
     """
     if cov.upper() == "HAC":
         return sm.OLS(y, _add_const(X)).fit(cov_type="HAC", cov_kwds={"maxlags": hac_lags or 1})
@@ -102,58 +70,71 @@ def _wald_F_for_zero_coefs(res, target_cols: List[str]) -> Tuple[float, float, i
     return F_stat, p_value, df_num, df_den
 
 
-def _moving_block_indices(n: int, block_size: int, rng: np.random.Generator) -> np.ndarray:
-    """Generate indices for Moving Block Bootstrap (overlapping blocks)."""
-    if block_size < 1 or block_size > n:
-        raise ValueError("block_size must be in [1, n]")
-    n_blocks = int(np.ceil(n / block_size))
-    starts = rng.integers(0, n - block_size + 1, size=n_blocks)
-    idx = np.concatenate([np.arange(s, s + block_size) for s in starts])[:n]
-    return idx
+# -------------------------
+# Wild bootstrap utilities
+# -------------------------
+
+def _wild_weights(n: int, rng: np.random.Generator, dist: str = "rademacher") -> np.ndarray:
+    """
+    Generate i.i.d. wild bootstrap weights with mean 0 and variance 1.
+    Options:
+      - 'rademacher': P(+1)=P(-1)=0.5  (robust, standard choice)
+      - 'normal': standard normal N(0,1)
+    """
+    d = dist.lower()
+    if d == "rademacher":
+        w = rng.integers(0, 2, size=n) * 2 - 1   # {+1,-1}
+        return w.astype(float) 
+    elif d == "normal":
+        return rng.standard_normal(n)
+    else:
+        raise ValueError(f"Unknown wild weight distribution: {dist}")
 
 
-def _gc_bootstrap_null(
+def _gc_wild_bootstrap_null(
     y: pd.Series,
     X_restricted: pd.DataFrame,
     X_unrestricted: pd.DataFrame,
     tested_cols: List[str],
     n_boot: int = 1000,
-    block_size: int = 5,
     seed: int = 42,
+    weight_dist: str = "rademacher",
     cov: str = "HAC",
     hac_lags: Optional[int] = None,
 ) -> Tuple[float, int]:
     """
-    Null-imposing MBB p-value for GC Wald F-test (right-tailed).
+    Null-imposing **wild residual bootstrap** p-value for GC Wald F-test (right-tailed).
 
     Steps
     -----
-    1) Fit Restricted model (R): get fitted values and residuals.
+    1) Fit Restricted model (R): get fitted values yhat_R and residuals e_R.
     2) Compute observed F from Unrestricted (U) with tested_cols.
     3) For b=1..B:
-       - Resample residuals via MBB to e_b.
-       - y_b = yhat_R + e_b  (simulation under H0)
-       - Fit U on (y_b, XU_b) and record F_b.
+       - Draw i.i.d. weights w_t with E[w]=0, Var[w]=1 (e.g., Rademacher).
+       - e_b = e_R * w   (element-wise)
+       - y_b = yhat_R + e_b   (simulation under H0 with heteroskedasticity preserved)
+       - Fit U on (y_b, XU) and record F_b.
     4) p = (#{F_b >= F_obs}+1)/(B_valid+1)
     """
     rng = default_rng(seed)
 
+    # Restricted fit (no tested_cols)
     res_R = sm.OLS(y, _add_const(X_restricted)).fit()
     yhat_R = res_R.fittedvalues
-    ehat_R = y - yhat_R
+    e_R = y - yhat_R
 
+    # Observed unrestricted F
     res_U = _fit_ols(y, X_unrestricted, cov=cov, hac_lags=hac_lags)
     F_obs, _, _, _ = _wald_F_for_zero_coefs(res_U, tested_cols)
 
     F_boot: List[float] = []
     n = len(y)
+
     for _ in range(n_boot):
         try:
-            idx = _moving_block_indices(n, block_size, rng)
-            e_b = ehat_R.iloc[idx].reset_index(drop=True)
-            y_b = yhat_R.reset_index(drop=True) + e_b
-            XU_b = X_unrestricted.iloc[idx].reset_index(drop=True)
-
+            w = _wild_weights(n, rng, dist=weight_dist)        # i.i.d., mean 0, var 1
+            y_b = yhat_R.reset_index(drop=True) + (e_R.reset_index(drop=True) * w)
+            XU_b = X_unrestricted.reset_index(drop=True)       # same design matrix order
             res_b = _fit_ols(y_b, XU_b, cov=cov, hac_lags=hac_lags)
             F_b, _, _, _ = _wald_F_for_zero_coefs(res_b, tested_cols)
             if np.isfinite(F_b):
@@ -188,11 +169,11 @@ def _process_ticker_variant(
     p_ret: int,
     p_x: int,
     min_obs: int,
-    block_size: int,
     n_boot: int,
     base_seed: int,
     cov_for_analytic: str,
     hac_lags: Optional[int],
+    weight_dist: str,
 ) -> List[Dict]:
     """
     Run both directions for a single (ticker, variant) slice and return row dicts.
@@ -235,14 +216,14 @@ def _process_ticker_variant(
 
         seed = int((abs(hash((str(year_key), str(ticker), var, "A2R"))) % (2**31 - 1)) + base_seed)
         try:
-            p_boot, n_valid = _gc_bootstrap_null(
+            p_boot, n_valid = _gc_wild_bootstrap_null(
                 y=y_sub,
                 X_restricted=XR_sub,
                 X_unrestricted=XU_sub,
                 tested_cols=xlag_cols,
                 n_boot=n_boot,
-                block_size=block_size,
                 seed=seed,
+                weight_dist=weight_dist,
                 cov=("HAC" if use_hac else "HC3"),
                 hac_lags=_hac_lags,
             )
@@ -257,7 +238,6 @@ def _process_ticker_variant(
             "p_ret": p_ret,
             "p_x": p_x,
             "N_obs": len(sub_r),
-            "block_size": block_size,
             "N_boot": n_boot,
             "N_boot_valid": n_valid,
             "F_stat": F_stat,
@@ -298,14 +278,14 @@ def _process_ticker_variant(
 
         seed = int((abs(hash((str(year_key), str(ticker), var, "R2A"))) % (2**31 - 1)) + base_seed)
         try:
-            p_boot, n_valid = _gc_bootstrap_null(
+            p_boot, n_valid = _gc_wild_bootstrap_null(
                 y=y_sub,
                 X_restricted=XR_sub,
                 X_unrestricted=XU_sub,
                 tested_cols=ret_lag_cols,
                 n_boot=n_boot,
-                block_size=block_size,
                 seed=seed,
+                weight_dist=weight_dist,
                 cov=("HAC" if use_hac else "HC3"),
                 hac_lags=_hac_lags,
             )
@@ -320,7 +300,6 @@ def _process_ticker_variant(
             "p_ret": p_ret,
             "p_x": p_x,
             "N_obs": len(sub_x),
-            "block_size": block_size,
             "N_boot": n_boot,
             "N_boot_valid": n_valid,
             "F_stat": F_stat,
@@ -339,7 +318,7 @@ def _process_ticker_variant(
 # Main entry point
 # ---------------------------------------------------------------------
 
-def run_gc_mbboot_fdr(
+def run_gc_mbboot_fdr(   # keep name for backwards compatibility
     aini_df: pd.DataFrame,
     fin_data: pd.DataFrame,
     version: str,
@@ -347,12 +326,12 @@ def run_gc_mbboot_fdr(
     p_ret: int = 1,
     p_x: int = 3,
     min_obs: int = 60,
-    block_size: int = 5,
     n_boot: int = 1000,
     seed: int = 42,
     fdr_alpha: float = 0.05,
     cov_for_analytic: str = "HAC",     # "HAC" (recommended) or "HC3"
     hac_lags: Optional[int] = None,    # If None and HAC, auto by T
+    weight_dist: str = "rademacher",   # 'rademacher' | 'mammen' | 'normal'
     save_csv: bool = True,
     outdir: Optional[Path] = None,
     outname: Optional[str] = None,     # If None -> f"granger_causality_{version}.csv"
@@ -361,7 +340,7 @@ def run_gc_mbboot_fdr(
     """
     Granger causality (AINI→Return and Return→AINI) with:
       - Analytic Wald/F p-values (HC3 or HAC)
-      - Null-imposing MBB empirical p-values
+      - Null-imposing **wild bootstrap** empirical p-values
       - Benjamini–Hochberg FDR per (Ticker, Year, Direction)
       - Parallel estimation across (ticker, variant) jobs
 
@@ -386,24 +365,15 @@ def run_gc_mbboot_fdr(
     fin_data = fin_data.dropna(subset=["log_return"])
     fin_data["date"] = pd.to_datetime(fin_data["Date"])
 
-    # Year splits (including overlaps as in your baseline)
-    threshold_23 = pd.Timestamp("2023-12-31")
+    # Year splits
     threshold_24 = pd.Timestamp("2024-01-01")
     threshold_25 = pd.Timestamp("2025-01-01")
-
-    fin_data_23 = fin_data[fin_data["date"] < threshold_24]
-    fin_data_24 = fin_data[(fin_data["date"] > threshold_23) & (fin_data["date"] < threshold_25)]
-    fin_data_25 = fin_data[fin_data["date"] >= threshold_25]
-
-    fin_data_23_24 = fin_data[fin_data["date"] <= threshold_25]
-    fin_data_24_25 = fin_data[fin_data["date"] > threshold_23]
-
     fin_data_by_year = {
-        2023: fin_data_23,
-        2024: fin_data_24,
-        2025: fin_data_25,
-        "2023_24": fin_data_23_24,
-        "2024_25": fin_data_24_25,
+        2023: fin_data[fin_data["date"] < threshold_24],
+        2024: fin_data[(fin_data["date"] >= threshold_24) & (fin_data["date"] < threshold_25)],
+        2025: fin_data[fin_data["date"] >= threshold_25],
+        "2023_24": fin_data[fin_data["date"] < threshold_25],
+        "2024_25": fin_data[fin_data["date"] >= threshold_24],
         "2023_24_25": fin_data,
     }
 
@@ -416,9 +386,7 @@ def run_gc_mbboot_fdr(
 
     # Iterate year partitions
     for year_key, fin in fin_data_by_year.items():
-        f = fin.copy()
-        f["date"] = pd.to_datetime(f["date"])
-        f = f.rename(columns={"Ticker": "ticker", "LogReturn": "log_return"})
+        f = fin.copy().rename(columns={"Ticker": "ticker"})
         f = f.sort_values(["ticker", "date"])
 
         # Merge contemporaneous AINI columns
@@ -431,19 +399,16 @@ def run_gc_mbboot_fdr(
             d = d.sort_values("date").reset_index(drop=True)
 
             # On-the-fly z for normalized_AINI
-            eff_variants = list(aini_variants)  # shallow copy
+            eff_variants = list(aini_variants)
             if "normalized_AINI" in d.columns:
                 s = pd.to_numeric(d["normalized_AINI"], errors="coerce")
-                mu = s.mean(skipna=True)
-                sd = s.std(skipna=True)
+                mu, sd = s.mean(skipna=True), s.std(skipna=True)
                 if pd.notna(sd) and float(sd) > 0.0:
                     d = d.copy()
                     d["normalized_AINI_z"] = (s - mu) / (sd if sd > 1e-12 else 1e-12)
                     eff_variants.append("normalized_AINI_z")
 
-            # Create one job per (ticker, variant)
             for var in eff_variants:
-                # Skip if column missing (robust to user-supplied lists)
                 if var not in d.columns:
                     continue
                 tasks.append((d, str(ticker), year_key, var))
@@ -458,16 +423,15 @@ def run_gc_mbboot_fdr(
                 p_ret=p_ret,
                 p_x=p_x,
                 min_obs=min_obs,
-                block_size=block_size,
                 n_boot=n_boot,
                 base_seed=base_seed,
                 cov_for_analytic=cov_for_analytic,
                 hac_lags=hac_lags,
+                weight_dist=weight_dist,
             )
             for (td, tkr, yrk, vr) in tasks
         )
 
-        # Flatten and collect
         for rows in results_nested:
             all_rows.extend(rows)
 
@@ -479,7 +443,7 @@ def run_gc_mbboot_fdr(
         for (ticker, year, direction), g in out.groupby(["Ticker", "Year", "Direction"], dropna=False):
             g = g.copy()
 
-            # FDR on Empirical_F_pval (primary)
+            # FDR on Empirical_F_pval (primary, wild bootstrap)
             p_emp = pd.to_numeric(g["Empirical_F_pval"], errors="coerce")
             if p_emp.notna().sum() >= 2:
                 rej, p_corr = multipletests(p_emp, alpha=fdr_alpha, method="fdr_bh")[:2]
@@ -493,7 +457,7 @@ def run_gc_mbboot_fdr(
             p_ana = pd.to_numeric(g["Original_F_pval"], errors="coerce")
             if p_ana.notna().sum() >= 2:
                 rej2, p_corr2 = multipletests(p_ana, alpha=fdr_alpha, method="fdr_bh")[:2]
-                g["BH_reject_F_HC3"] = rej2   # key kept for compatibility
+                g["BH_reject_F_HC3"] = rej2   # name kept for compatibility
                 g["BH_corr_F_pval_HC3"] = p_corr2
             else:
                 g["BH_reject_F_HC3"] = False
@@ -507,10 +471,7 @@ def run_gc_mbboot_fdr(
     if outname is None:
         outname = f"granger_causality_{version}.csv"
 
-    if save_csv:
-        if out.empty:
-            # Avoid writing empty files silently
-            raise ValueError("No GC rows produced. Check min_obs, variant columns, or input merges.")
+    if not out.empty and save_csv:
         if outdir is None:
             try:
                 base = Path(__file__).resolve().parents[2]

@@ -113,13 +113,14 @@ AI_narrative_index/
 │   │
 │   ├── modelling/
 │   │   ├── ai_windows.py                       # Extract context-aware snippets around AI keywords
-│   │   ├── predict_binary_AINI_FinBERT.py      # Classify articles (AI-related vs. not) using FinBERT
+│   │   ├── predict_binary_AINI_FinBERT.py      # Classify articles (AI-related vs. not) using custom FinBERT
 │   │   ├── predict_AINI_FinBERT_window.py      # Classify with windowed context using FinBERT
 │   │   ├── CustomFinBERT.py                    # Define custom FinBERT model with dropout & class weights
 │   │   ├── stationarity_testing.py             # Perform ADF and PP stationarity tests
-│   │   ├── transfer_entropy.py                 # Estimate Transfer Entropy between AINI and financial variables
-│   │   ├── granger_causality.py                # Run Granger causality with heteroskedasticity-aware bootstrapping
-│   │   └── construct_AINI_variables.py         # Build daily AINI index with normalization, EMA, growth etc.
+│   │   ├── estimate_transfer_entropy.py        # Estimate Transfer Entropy between AINI and financial variables
+│   │   ├── estimate_granger_causality.py       # Estimate Granger causality with heteroskedasticity-aware bootstrapping
+│   │   ├── estimate_OLS.py                     # Estimate OLS for same-day returns with heteroskedasticity-aware bootstrapping
+│   │   └── construct_AINI_variables.py         # Build daily AINI index with normalization, EMA etc.
 │   │
 │   ├── visualizations/
 │   │   ├── construct_latex_tables.py           # Construct latex tables for final thesis
@@ -138,7 +139,9 @@ AI_narrative_index/
 │   │   ├── run_predict_binary_AINI_FinBERT.py  # Run binary AINI classification pipeline
 │   │   ├── run_predict_AINI_FinBERT_window.py  # Run context-aware classification on snippets
 │   │   │── run_combine_article_dbs.py          # Concatenates yearly WSJ-Databases into single CSV
-│   │   │── run_fix_article_ids                 # Run function to ensure unique article_id in database
+│   │   │── run_fix_article_ids.py              # Run function to ensure unique article_id in database
+│   │   │── run_estimate_granger_causality.py   # Run function to estimate Granger Causality
+│   │   │── run_estimate_OLS.py                 # Run function to estimate OLS
 │   │   │── run_naive_labeling.py               # Label AI-relavance based on naive keywords
 │       └── run_construct_AINI_variables.py     # Construct final AINI index file for modeling
 │

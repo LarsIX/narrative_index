@@ -14,7 +14,7 @@ import datetime as dt
 
 def build_df(df_1, df_2, df_3=None, df_4=None, cutoff_min=None, cutoff_max=None, vers="binary"):
     """
-    Concatenates raw AINI predictions for different intervals with min and max cutoffs and outputs EMAs, relative frequencies, and growth rates.
+    Concatenates raw AINI predictions for different intervals with min and max cutoffs and outputs EMAs, relative frequencies
 
     Parameters
     ----------
@@ -49,9 +49,6 @@ def build_df(df_1, df_2, df_3=None, df_4=None, cutoff_min=None, cutoff_max=None,
     # Concatenate inputs
     df_concat = pd.concat(df_list, ignore_index=True)
     df_cut = df_concat[(df_concat["date"] > cutoff_min) & (df_concat["date"] < cutoff_max)]
-
-    # Rename and aggregate
-    df_cut = df_cut.rename(columns={"predicted_label": "hype_score"})
 
     simple_AINI = df_cut.groupby("date")["hype_score"].sum()
     daily_count = df_cut.groupby("date")["hype_score"].count()

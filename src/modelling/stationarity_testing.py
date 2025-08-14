@@ -1,178 +1,233 @@
 """
 stationarity_testing.py
 
-Provides functions to assess the stationarity of AINI sentiment indices and financial time series
-using Augmented Dickey-Fuller (ADF) and Phillips-Perron (PP) tests.
-
-Functions
----------
-- test_stationarity_aini_variants: Runs ADF and PP tests on multiple AINI variants across yearly subsets.
-- test_stationarity_fin_variables: Applies ADF and PP tests to financial variables grouped by ticker and time period.
-
-Results are saved as CSV files and returned as pandas DataFrames.
-
-Dependencies
-------------
-- pandas
-- pathlib
-- statsmodels
-- arch
+Assess stationarity of AINI indices and financial variables using ADF and Phillips–Perron.
+Saves CSV/HTML to reports/tables and returns pandas DataFrames.
 """
 
-import pandas as pd
 from pathlib import Path
+from typing import Iterable, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
 from statsmodels.tsa.stattools import adfuller
 from arch.unitroot import PhillipsPerron
 
 
-def test_stationarity_aini_variants(aini_data, variants=None, window = None):
+# ------------------------------ #
+# Helpers
+# ------------------------------ #
+
+def _project_paths() -> Tuple[Path, Path]:
+    root = Path(__file__).resolve().parents[2]
+    var_path = root / "data" / "processed" / "variables"
+    table_path = root / "reports" / "tables"
+    var_path.mkdir(parents=True, exist_ok=True)
+    table_path.mkdir(parents=True, exist_ok=True)
+    return var_path, table_path
+
+
+def _clean_series(x: pd.Series) -> pd.Series:
+    # Ensure numeric and finite
+    return pd.to_numeric(x, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+
+
+def _run_adf_pp(series: pd.Series) -> Tuple[float, float, float, float]:
+    # ADF (autolag AIC), PP (default Bartlett kernel)
+    adf_stat, adf_p, *_ = adfuller(series, autolag="AIC")
+    pp = PhillipsPerron(series)
+    return adf_stat, adf_p, float(pp.stat), float(pp.pvalue)
+
+
+
+# ------------------------------ #
+# AINI variants
+# ------------------------------ #
+
+def test_stationarity_aini_variants(
+    aini_data: pd.DataFrame,
+    variants: Optional[str] = None,
+    window: Optional[int] = None,
+    aini_cols: Optional[Iterable[str]] = None,
+    alpha: float = 0.05,
+    min_obs: int = 20,
+) -> pd.DataFrame:
     """
-    Perform stationarity tests (ADF & Phillips-Perron) on AINI index variants over different time windows.
+    Run ADF & PP on selected AINI columns over multiple time windows.
 
     Parameters
     ----------
-    aini_data : DataFrame
-        AINI dataset containing date and all target variants as columns.
-    variants : list of str, optional
-        Specific AINI columns to test. If None, a default list is used.
-    window : int or str, optional
-        Context window size for documentation (not used in logic).
+    aini_data : DataFrame with at least 'date' and the AINI columns.
+    variants  : str label for the dataset (used in filenames).
+    window    : None, 0, 1, 2 – only used in filenames/metadata.
+    aini_cols : iterable of column names to test. Defaults to common AINI fields.
+    alpha     : significance level for stationarity agreement.
+    min_obs   : minimum observations to attempt a unit-root test.
 
     Returns
     -------
-    DataFrame
-        Results of stationarity tests including statistics and p-values, saved as CSV.
+    DataFrame of results; also saved to CSV/HTML.
     """
+    var_path, table_path = _project_paths()
 
-    root = Path(__file__).resolve().parents[2]
-    var_path = root / "data" / "processed" / "variables"
-    var_path.mkdir(parents=True, exist_ok=True)
+    if aini_cols is None:
+        aini_cols = ["normalized_AINI", "EMA_02", "EMA_08"]
 
-    output_file = var_path / (
-        f"stationarity_tests_aini_window{window}_var.csv" if window else "stationarity_tests_aini_var.csv"
-    )
+    df = aini_data.copy()
+    df["date"] = pd.to_datetime(df["date"])
 
-    if variants is None:
-        variants = [
-            "normalized_AINI", "MA_7", "MA_30", "EMA_02", "EMA_04", "EMA_06",
-            "EMA_08", "normalized_AINI_growth", "relative_AINI_weekly", "relative_AINI_month"
-        ]
-
-    aini_data['date'] = pd.to_datetime(aini_data['date'])
-
-    # Subsets by time period
-    data_subsets = {
-        "2023": aini_data[aini_data['date'] < "2024-01-01"],
-        "2024": aini_data[(aini_data['date'] >= "2024-01-01") & (aini_data['date'] < "2025-01-01")],
-        "2025": aini_data[aini_data['date'] >= "2025-01-01"],
-        "2023_24": aini_data[aini_data['date'] < "2025-01-01"],
-        "2024_25": aini_data[aini_data['date'] >= "2024-01-01"],
-        "2023_25": aini_data.copy(),
+    subsets = {
+        "2023": df[df["date"] < "2024-01-01"],
+        "2024": df[(df["date"] >= "2024-01-01") & (df["date"] < "2025-01-01")],
+        "2025": df[df["date"] >= "2025-01-01"],
+        "2023_24": df[df["date"] < "2025-01-01"],
+        "2024_25": df[df["date"] >= "2024-01-01"],
+        "2023_25": df,  # full
     }
 
-    results = []
-
-    for period, df in data_subsets.items():
-        for variant in variants:
+    rows: List[dict] = []
+    for period, dsub in subsets.items():
+        for col in aini_cols:
             try:
-                series = df[variant].dropna()
+                s = _clean_series(dsub[col])
+                n = int(s.shape[0])
+                if n < min_obs:
+                    rows.append({
+                        "Period": period,
+                        "AINI_variant": col,
+                        "Context_window": window,
+                        "N": n,
+                        "ADF_stat": np.nan, "ADF_p": np.nan,
+                        "PP_stat": np.nan, "PP_p": np.nan,
+                        "agree_stationarity": False,
+                        "error": f"too_few_obs(<{min_obs})"
+                    })
+                    continue
 
-                adf_stat, adf_p, *_ = adfuller(series, autolag='AIC')
-                pp_test = PhillipsPerron(series)
-                pp_stat = pp_test.stat
-                pp_p = pp_test.pvalue
-                agree = adf_p < 0.05 and pp_p < 0.05
-
-                results.append({
+                adf_stat, adf_p, pp_stat, pp_p = _run_adf_pp(s)
+                rows.append({
                     "Period": period,
-                    "AINI_variant": variant,
+                    "AINI_variant": col,
                     "Context_window": window,
-                    "ADF_stat": adf_stat,
-                    "ADF_p": adf_p,
-                    "PP_stat": pp_stat,
-                    "PP_p": pp_p,
-                    "agree_stationarity": agree
+                    "N": n,
+                    "ADF_stat": adf_stat, "ADF_p": adf_p,
+                    "PP_stat": pp_stat, "PP_p": pp_p,
+                    "agree_stationarity": (adf_p < alpha) and (pp_p < alpha),
+                    "error": ""
                 })
 
             except Exception as e:
-                print(f"Stationarity test failed for {variant} ({period}): {e}")
+                rows.append({
+                    "Period": period,
+                    "AINI_variant": col,
+                    "Context_window": window,
+                    "N": int(dsub.shape[0]),
+                    "ADF_stat": np.nan, "ADF_p": np.nan,
+                    "PP_stat": np.nan, "PP_p": np.nan,
+                    "agree_stationarity": False,
+                    "error": str(e)
+                })
 
-    # Save final results
-    df_results = pd.DataFrame(results)
-    df_results.to_csv(output_file, index=False)
-    print(f"Stationarity test results saved to: {output_file}")
+    out = pd.DataFrame(rows).sort_values(["Period", "AINI_variant"]).reset_index(drop=True)
 
-    # return df for further analysis
-    return df_results
+    # Filenames 
+    suffix = f"window{window}_" if (window is not None) else ""
+    label = variants or "aini"
+    csv_file = var_path / f"stationarity_tests_{suffix}{label}.csv"
+    html_file = table_path / f"stationarity_tests_{suffix}{label}.html"
 
-def test_stationarity_fin_variables(fin_data, fin_var=None):
+    out.to_csv(csv_file, index=False)
+    out.to_html(html_file, index=False)
+    print(f"Saved AINI stationarity results -> CSV: {csv_file} | HTML: {html_file}")
+    return out
+
+
+# ------------------------------ #
+# Financial variables
+# ------------------------------ #
+
+def test_stationarity_fin_variables(
+    fin_data: pd.DataFrame,
+    fin_vars: Optional[Iterable[str]] = None,
+    alpha: float = 0.05,
+    min_obs: int = 20,
+    date_col: str = "Date",
+    ticker_col: str = "Ticker",
+    label: str = "fin_var"
+) -> pd.DataFrame:
     """
-    Run ADF & PP stationarity tests on financial time series, grouped by ticker and time period.
+    Run ADF & PP on financial variables, grouped by ticker and time window.
 
     Parameters
     ----------
-    fin_data : DataFrame
-        Financial dataset with 'Date', 'Ticker', and target variables.
-    fin_var : list of str, optional
-        List of variable names to test (e.g., 'Adj Close', 'LogReturn').
+    fin_data  : DataFrame with date_col, ticker_col, and variables in fin_vars.
+    fin_vars  : iterable of variables (e.g., ["Adj Close", "LogReturn"]).
+    alpha     : significance level for agreement.
+    min_obs   : minimum observations.
+    date_col  : name of the date column in fin_data.
+    ticker_col: name of the ticker column.
+    label     : filename label.
 
     Returns
     -------
-    DataFrame
-        Results of stationarity tests saved as CSV and returned as DataFrame.
+    DataFrame; also saved to CSV/HTML.
     """
+    var_path, table_path = _project_paths()
 
-    root = Path(__file__).resolve().parents[2]
-    var_path = root / "data" / "processed" / "variables"
-    var_path.mkdir(parents=True, exist_ok=True)
+    if fin_vars is None:
+        fin_vars = ["Adj Close","LogReturn"]
 
-    output_file = var_path / "stationarity_tests_fin_var.csv"
+    df = fin_data.copy()
+    df["date"] = pd.to_datetime(df[date_col])
 
-    if fin_var is None:
-        fin_var = ["Adj Close", "Volume", "LogReturn"]
-
-    fin_data['date'] = pd.to_datetime(fin_data['Date'])
-
-    # Define year-based subsets
-    data_subsets = {
-        "2023": fin_data[fin_data['date'] < "2024-01-01"],
-        "2024": fin_data[(fin_data['date'] >= "2024-01-01") & (fin_data['date'] < "2025-01-01")],
-        "2025": fin_data[fin_data['date'] >= "2025-01-01"],
-        "2023_24": fin_data[fin_data['date'] < "2025-01-01"],
-        "2024_25": fin_data[fin_data['date'] >= "2024-01-01"],
-        "2023_25": fin_data.copy(),
+    subsets = {
+        "2023": df[df["date"] < "2024-01-01"],
+        "2024": df[(df["date"] >= "2024-01-01") & (df["date"] < "2025-01-01")],
+        "2025": df[df["date"] >= "2025-01-01"],
+        "2023_24": df[df["date"] < "2025-01-01"],
+        "2024_25": df[df["date"] >= "2024-01-01"],
+        "2023_25": df,
     }
 
-    results = []
-
-    for period, df_period in data_subsets.items():
-        for ticker, df_group in df_period.groupby("Ticker"):
-            for variable in fin_var:
+    rows: List[dict] = []
+    for period, dsub in subsets.items():
+        for ticker, g in dsub.groupby(ticker_col, dropna=True):
+            for var in fin_vars:
                 try:
-                    series = df_group[variable].dropna()
+                    s = _clean_series(g[var])
+                    n = int(s.shape[0])
+                    if n < min_obs:
+                        rows.append({
+                            "Period": period, "Ticker": ticker, "Variable": var, "N": n,
+                            "ADF_stat": np.nan, "ADF_p": np.nan,
+                            "PP_stat": np.nan, "PP_p": np.nan,
+                            "agree_stationarity": False,
+                            "error": f"too_few_obs(<{min_obs})"
+                        })
+                        continue
 
-                    adf_stat, adf_p, *_ = adfuller(series, autolag='AIC')
-                    pp_test = PhillipsPerron(series)
-                    pp_stat = pp_test.stat
-                    pp_p = pp_test.pvalue
-                    agree = adf_p < 0.05 and pp_p < 0.05
-
-
-                    results.append({
-                        "Period": period,
-                        "Ticker": ticker,
-                        "Financial_variable": f"{ticker}_{variable}",
-                        "ADF_stat": adf_stat,
-                        "ADF_p": adf_p,
-                        "PP_stat": pp_stat,
-                        "PP_p": pp_p,
-                        "agree_stationarity": agree
+                    adf_stat, adf_p, pp_stat, pp_p = _run_adf_pp(s)
+                    rows.append({
+                        "Period": period, "Ticker": ticker, "Variable": var, "N": n,
+                        "ADF_stat": adf_stat, "ADF_p": adf_p,
+                        "PP_stat": pp_stat, "PP_p": pp_p,
+                        "agree_stationarity": (adf_p < alpha) and (pp_p < alpha),
+                        "error": ""
+                    })
+                except Exception as e:
+                    rows.append({
+                        "Period": period, "Ticker": ticker, "Variable": var, "N": int(g.shape[0]),
+                        "ADF_stat": np.nan, "ADF_p": np.nan,
+                        "PP_stat": np.nan, "PP_p": np.nan,
+                        "agree_stationarity": False,
+                        "error": str(e)
                     })
 
-                except Exception as e:
-                    print(f"Stationarity test failed for {ticker} / {variable} ({period}): {e}")
+    out = pd.DataFrame(rows).sort_values(["Period", "Ticker", "Variable"]).reset_index(drop=True)
 
-    df_results = pd.DataFrame(results)
-    df_results.to_csv(output_file, index=False)
-    print(f"Stationarity test results saved to: {output_file}")
-    return df_results
+    csv_file = var_path / f"stationarity_tests_{label}.csv"
+    html_file = table_path / f"stationarity_tests_{label}.html"
+    out.to_csv(csv_file, index=False)
+    out.to_html(html_file, index=False)
+    print(f"Saved FIN stationarity results -> CSV: {csv_file} | HTML: {html_file}")
+    return out
