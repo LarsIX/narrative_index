@@ -208,6 +208,8 @@ def _process_ticker_variant(
                              cov=("HAC" if use_hac else "HC3"),
                              hac_lags=_hac_lags)
             F_stat, p_analytic, df_num, df_den = _wald_F_for_zero_coefs(res_u, xlag_cols)
+            betas_dict = res_u.params.to_dict()
+            
         except Exception:
             res_u = None
             F_stat, p_analytic = np.nan, np.nan
@@ -235,7 +237,7 @@ def _process_ticker_variant(
             "AINI_variant": var,
             "Year": year_key,
             "Direction": "AINI_to_RET",
-            "p_ret": p_ret,
+            "betas": betas_dict,
             "p_x": p_x,
             "N_obs": len(sub_r),
             "N_boot": n_boot,
@@ -270,6 +272,7 @@ def _process_ticker_variant(
                              cov=("HAC" if use_hac else "HC3"),
                              hac_lags=_hac_lags)
             F_stat, p_analytic, df_num, df_den = _wald_F_for_zero_coefs(res_u, ret_lag_cols)
+            betas_dict = res_u.params.to_dict()
         except Exception:
             res_u = None
             F_stat, p_analytic = np.nan, np.nan
@@ -297,7 +300,7 @@ def _process_ticker_variant(
             "AINI_variant": var,
             "Year": year_key,
             "Direction": "RET_to_AINI",
-            "p_ret": p_ret,
+            "betas": betas_dict,
             "p_x": p_x,
             "N_obs": len(sub_x),
             "N_boot": n_boot,

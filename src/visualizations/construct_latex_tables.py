@@ -1,218 +1,280 @@
+# -*- coding: utf-8 -*-
 """
-construct_latex_tables.py
+Export regression / Granger-causality results to a DIN A4–friendly LaTeX longtable.
 
-This module provides functions to export formatted LaTeX tables from 
-Granger causality estimation results and model diagnostics.
+Key behavior
+------------
+- Renames 'p_x' -> 'n_lags' (kept), positioned right after 'AINI_variant' if present.
+- Drops columns: 'Direction', 'p_ret', 'N_obs', 'r2_u', 'N_boot', 'N_boot_valid'.
+- Appends significance stars to: 'BH_corr_F_pval' and 'BH_corr_F_pval_HC3'.
+- Uses LaTeX `longtable` (multi-page), sized to \\textwidth with very small font and tight spacing.
+- Escapes LaTeX special characters via `escape=True` (no manual underscore hacks needed).
+- Writes to: \\AI_narrative_index\\reports\\tables\\{output_filename}.tex
 
-It supports:
-- Coefficient reporting (including p-value significance stars)
-- Model fit statistics (AIC, BIC)
-- Residual diagnostics (Breusch–Pagan and White tests)
-- Context-specific output filenames and LaTeX labels
-- Automatic LaTeX formatting with column renaming and escaping
-
-Functions
----------
-build_coef_table(df, w, direction, caption, label)
-    Create a LaTeX table summarizing Granger causality test coefficients 
-    and significance levels (***, **, *).
-
-build_diagnostics_table(df, w, direction, caption, label)
-    Create a LaTeX table summarizing model diagnostics including AIC, BIC,
-    and tests for heteroskedasticity (BP and White tests).
-
-Examples
---------
->>> from export_latex_tables import build_coef_table, build_diagnostics_table
->>> build_coef_table(df_gc, w="1", direction="AINI_to_ret", caption="...", label="tab:gc_coef")
->>> build_diagnostics_table(df_diag, w="1", direction="AINI_to_ret", caption="...", label="tab:gc_diag")
+Stars:
+  *** for p < 0.01, ** for p < 0.05, * for p < 0.10
 """
+from __future__ import annotations
 
-
-import pandas as pd
 from pathlib import Path
+from typing import Optional, Sequence
+import re
+import numpy as np
+import pandas as pd
 
-root = Path(__file__).parents[2]
-output_path = root / "reports" / "tables"
-output_path.mkdir(parents=True, exist_ok=True)
 
-def build_coef_table(df, w, direction, caption, label):
+# ----------------------------- configuration -------------------------------- #
+# Columns to drop (exactly as requested; NOTE: p_x is kept via rename->n_lags)
+_DROP_COLS = [
+    "Direction",
+    "p_ret",
+    "N_obs",
+    "r2_u",        # unadjusted R^2
+    "N_boot",
+    "N_boot_valid",
+]
+
+# Preferred display order (only existing columns are kept, in this order)
+_PREFERRED_ORDER = [
+    "Ticker",
+    "AINI_variant",
+    "n_lags",                 # kept as exact name
+    "Year",
+    "F_stat",
+    "Original_F_pval",
+    "Empirical_F_pval",
+    "adj_r2_u",               # adjusted R^2 (kept if present)
+    "BH_corr_F_pval",
+    "BH_corr_F_pval_HC3",
+]
+
+
+# ------------------------------- helpers ------------------------------------ #
+def _project_tables_dir() -> Path:
+    """Resolve \\AI_narrative_index\\reports\\tables relative to this file."""
+    here = Path(__file__).resolve()
+    project_root = here.parents[2]  # .../AI_narrative_index
+    return project_root / "reports" / "tables"
+
+
+def _move_col_after(df: pd.DataFrame, col: str, after: str) -> pd.DataFrame:
+    """Move column `col` to immediately follow `after` when both exist."""
+    if col not in df.columns:
+        return df
+    cols = list(df.columns)
+    cols.remove(col)
+    if after in cols:
+        insert_pos = cols.index(after) + 1
+        cols.insert(insert_pos, col)
+        return df[cols]
+    return df
+
+
+def _stars_from_p(p: float) -> str:
+    """Return significance stars for p-value."""
+    try:
+        if pd.isna(p):
+            return ""
+        p = float(p)
+    except Exception:
+        return ""
+    if p < 0.01:
+        return "***"
+    if p < 0.05:
+        return "**"
+    if p < 0.10:
+        return "*"
+    return ""
+
+
+def _fmt_p_with_stars(p: float, digits: int = 3) -> str:
+    """Format p-value with fixed decimals and append stars."""
+    try:
+        if pd.isna(p):
+            return ""
+        p = float(p)
+        base = f"<0.{('0'*(digits-1))}1" if p < 10 ** (-digits) else f"{p:.{digits}f}"
+        return f"{base}{_stars_from_p(p)}"
+    except Exception:
+        return ""
+
+
+def _column_format(columns: Sequence[str]) -> str:
     """
-    Transforms estimated Granger Causality results to LaTeX table & writes table to /reports/tables.
+    Build a compact LaTeX column format string for longtable.
+
+    - Right-align numeric-like columns to keep numbers tight.
+    - Remove outer padding with @{} to maximize textwidth usage.
     """
+    numeric_like = {
+        "n_lags",
+        "Year",
+        "F_stat",
+        "Original_F_pval",
+        "Empirical_F_pval",
+        "adj_r2_u",
+        "BH_corr_F_pval",
+        "BH_corr_F_pval_HC3",
+    }
+    # Left (l) for text-like, Right (r) for numeric-like
+    spec = ["r" if c in numeric_like else "l" for c in columns]
+    return "@{}" + "".join(spec) + "@{}"
 
-    coef_list = ["Ticker", "AINI_variant", "Year", "coef_x1", "coef_x2", "Original_F", "BH_corr_F_pval"]
-    display_df = df.loc[:, coef_list].copy()
+def expand_year_range(val: str) -> str:
+        parts = val.split("_")
+        if all(p.isdigit() for p in parts):
+            expanded = []
+            for i, p in enumerate(parts):
+                if len(p) == 2:  # 2-digit year, prefix with '20'
+                    expanded.append("20" + p)
+                else:
+                    expanded.append(p)
+            return "-".join(expanded)
+        return val
 
-    display_df.columns = [
-        "Ticker", "AINI Variant", "Year", "Coef x1", "Coef x2", 
-        "F-Stat", "FDR p-val"
-    ]
-
-    display_df["FDR p-val"] = pd.to_numeric(display_df["FDR p-val"], errors="coerce")
-
-    def format_f_stat(row):
-        stars = ""
-        p = row["FDR p-val"]
-        if pd.notnull(p):
-            if p < 0.01:
-                stars = "***"
-            elif p < 0.05:
-                stars = "**"
-            elif p < 0.1:
-                stars = "*"
-        f = row["F-Stat"]
-        return f"{f:.2f}{stars}" if pd.notnull(f) else ""
-
-    display_df["Coef x1"] = pd.to_numeric(display_df["Coef x1"], errors="coerce").map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
-    display_df["Coef x2"] = pd.to_numeric(display_df["Coef x2"], errors="coerce").map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
-    display_df["F-Stat"] = display_df.apply(format_f_stat, axis=1)
-    display_df["FDR p-val"] = display_df["FDR p-val"].map(lambda x: f"{x:.3f}" if pd.notnull(x) else "")
-
-    display_df["AINI Variant"] = display_df["AINI Variant"].replace({
-        "EMA_02": "EMA\\_02",
-        "EMA_08": "EMA\\_08",
-        "normalized_AINI": "normalized\\_AINI",
-        "normalized_AINI_growth": "normalized\\_AINI\\_growth"
-    })
-
-    display_df["Year"] = display_df["Year"].replace({
-        "2023_24": "2023--2024",
-        "2024_25": "2024--2025",
-        "2023_24_25": "2023--2025"
-    })
-
-    inner_table = display_df.to_latex(
-        index=False,
-        caption='',
-        label='',
-        column_format="l l l r r r r",
-        escape=False
-    )
-
-    latex_note = "\\vspace{0.2cm}\n\\textit{Note:} \\textbf{***} p$<$0.01, \\textbf{**} p$<$0.05, \\textbf{*} p$<$0.1"
-
-    latex_table = f"""\\begin{{table}}[H]
-\\normalsize
-\\centering
-\\caption{{{caption}}}
-\\label{{{label}}}
-\\resizebox{{\\textwidth}}{{!}}{{
-{inner_table}
-}}
-{latex_note}
-\\end{{table}}"""
-
-    tex_filename = output_path / f"gc_w{w}_{direction}.tex"
-    with open(tex_filename, "w", encoding="utf-8") as f:
-        f.write(latex_table)
-
-    return latex_table
-
-
-def build_diagnostics_table(df, w, direction, caption, label):
+# ------------------------------- main API ----------------------------------- #
+def export_regression_table(
+    df: pd.DataFrame,
+    title: str,
+    output_filename: str,
+    *,
+    p_digits: int = 3,
+    f_digits: int = 2,
+    r2_digits: int = 3,
+    font_size_cmd: str = "tiny",   # 'tiny' is smaller than 'scriptsize'
+    tabcolsep_pt: float = 2.0,     # even tighter spacing for A4 fit
+) -> Path:
     """
-    Transforms Granger model diagnostics into a LaTeX table & writes it to /reports/tables.
+    Export regression/GC results to LaTeX `longtable` (DIN A4 friendly).
 
     Parameters
     ----------
-    df : pd.DataFrame
-        DataFrame containing: 'Ticker', 'AINI_variant', 'Year', 'Lag',
-        'AIC', 'BIC', 'bp_stat', 'BP_pval', 'White_stat', 'White_pval'.
-    w : str
-        Context window size used in estimation.
-    direction : str
-        Direction of causality tested (e.g., 'AINI_to_ret').
-    caption : str
-        Caption for the LaTeX table.
-    label : str
-        LaTeX label for referencing the table.
+    df : pandas.DataFrame
+        Input DataFrame with results. Expected columns (as available):
+        'Ticker','AINI_variant','p_x','n_lags','Year','F_stat',
+        'Original_F_pval','Empirical_F_pval','adj_r2_u',
+        'BH_corr_F_pval','BH_corr_F_pval_HC3'.
+    title : str
+        LaTeX caption for the table.
+    output_filename : str
+        Base filename; '.tex' is appended if missing.
+
+    Other Parameters
+    ----------------
+    p_digits : int, default=3
+        Decimals for p-values.
+    f_digits : int, default=2
+        Decimals for F-statistics.
+    r2_digits : int, default=3
+        Decimals for adjusted R².
+    font_size_cmd : str, default='tiny'
+        LaTeX size command to apply right before the longtable
+        (examples: 'tiny', 'scriptsize', 'footnotesize').
+    tabcolsep_pt : float, default=2.0
+        Value for \\tabcolsep (in pt) to tighten column spacing.
 
     Returns
     -------
-    str
-        The LaTeX-formatted table string.
+    pathlib.Path
+        Path to the written `.tex` file.
+
+    Notes
+    -----
+    - `p_x` is renamed to `n_lags` (and kept). The original `p_x` is then removed via the drop list.
+    - Drops only: 'Direction', 'p_ret', 'N_obs', 'r2_u', 'N_boot', 'N_boot_valid'.
+    - Star annotations are added only to BH-adjusted p-values.
+    - The output is a **top-level** `longtable` (no float/resizebox), with zero longtable
+      left/right margins, very small font, and tight column spacing to fit DIN A4.
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("df must be a pandas.DataFrame")
 
-    # Ensure consistent column names
-    df = df.rename(columns={"bp_stat": "BP_stat"})
+    # Resolve output path
+    outdir = _project_tables_dir()
+    outdir.mkdir(parents=True, exist_ok=True)
+    if not output_filename.endswith(".tex"):
+        output_filename += ".tex"
+    out_path = outdir / output_filename
 
-    col_list = ['Ticker', 'AINI_variant', 'Year', 'Lag', 'AIC', 'BIC', 'BP_stat', 'BP_pval', 'White_stat', 'White_pval']
-    display_df = df.loc[:, col_list].copy()
+    # 1) Rename p_x -> n_lags (keep)
+    work = df.copy()
+    if "p_x" in work.columns:
+        work["n_lags"] = work["p_x"]
 
-    # Rename for LaTeX
-    display_df.columns = [
-        "Ticker", "AINI Variant", "Year", "Lag", 
-        "AIC", "BIC", 
-        "BP Stat", "BP p-val", 
-        "White Stat", "White p-val"
-    ]
+    # 2) Drop the requested columns (p_x removed implicitly via rename+drop)
+    work = work.drop(columns=[c for c in _DROP_COLS if c in work.columns], errors="ignore")
 
-    # Format all floats first
-    for col in ["AIC", "BIC", "BP Stat", "BP p-val", "White Stat", "White p-val"]:
-        display_df[col] = pd.to_numeric(display_df[col], errors="coerce")
+    # 3) Ensure n_lags is positioned after AINI_variant if both exist
+    work = _move_col_after(work, "n_lags", "AINI_variant")
 
-    # Add stars based on significance for BP and White tests
-    def add_stars(stat, pval):
-        if pd.isnull(stat) or pd.isnull(pval):
-            return ""
-        stars = ""
-        if pval < 0.01:
-            stars = "***"
-        elif pval < 0.05:
-            stars = "**"
-        elif pval < 0.1:
-            stars = "*"
-        return f"{stat:.2f}{stars}"
+    # 4) Keep/arrange a compact, explicit column order
+    ordered_cols = [c for c in _PREFERRED_ORDER if c in work.columns]
+    if ordered_cols:
+        work = work[ordered_cols]
 
-    display_df["BP Stat"] = display_df.apply(lambda row: add_stars(row["BP Stat"], row["BP p-val"]), axis=1)
-    display_df["White Stat"] = display_df.apply(lambda row: add_stars(row["White Stat"], row["White p-val"]), axis=1)
+    # Year column: expand underscores to full year range
 
-    # Format p-values
-    display_df["BP p-val"] = display_df["BP p-val"].map(lambda x: f"{x:.3f}" if pd.notnull(x) else "")
-    display_df["White p-val"] = display_df["White p-val"].map(lambda x: f"{x:.3f}" if pd.notnull(x) else "")
+    if "Year" in work.columns:
+        work["Year"] = work["Year"].astype(str).apply(expand_year_range)
 
-    # Clean variant names for LaTeX
-    display_df["AINI Variant"] = display_df["AINI Variant"].replace({
-        "EMA_02": "EMA\\_02",
-        "EMA_08": "EMA\\_08",
-        "normalized_AINI": "normalized\\_AINI",
-        "normalized_AINI_growth": "normalized\\_AINI\\_growth"
-    })
 
-    display_df["Year"] = display_df["Year"].replace({
-        "2023_24": "2023--2024",
-        "2024_25": "2024--2025",
-        "2023_24_25": "2023--2025"
-    })
+    # 5) Formatting (use strings for display)
+    # F-stat
+    if "F_stat" in work.columns:
+        work["F_stat"] = work["F_stat"].apply(lambda v: "" if pd.isna(v) else f"{float(v):.{f_digits}f}")
 
-       display_df["Ticker"] = display_df["Ticker"].replace({
-        "TSM": "TSMC"
-    })
+    # Year column
 
-    inner_table = display_df.to_latex(
+    if "Year" in work.columns:
+        work["Year"] = work["Year"].astype(str).str.replace("_", "-", regex=False)
+
+    # Adjusted R^2 (if present)
+    if "adj_r2_u" in work.columns:
+        work["adj_r2_u"] = work["adj_r2_u"].apply(lambda v: "" if pd.isna(v) else f"{float(v):.{r2_digits}f}")
+
+    # Plain p-values (no stars)
+    for pcol in ("Original_F_pval", "Empirical_F_pval"):
+        if pcol in work.columns:
+            work[pcol] = work[pcol].apply(
+                lambda v: ""
+                if pd.isna(v)
+                else (f"<0.{('0'*(p_digits-1))}1" if float(v) < 10 ** (-p_digits) else f"{float(v):.{p_digits}f}")
+            )
+
+    # BH-adjusted p-values WITH stars
+    if "BH_corr_F_pval" in work.columns:
+        work["BH_corr_F_pval"] = work["BH_corr_F_pval"].apply(lambda v: _fmt_p_with_stars(v, p_digits))
+    if "BH_corr_F_pval_HC3" in work.columns:
+        work["BH_corr_F_pval_HC3"] = work["BH_corr_F_pval_HC3"].apply(lambda v: _fmt_p_with_stars(v, p_digits))
+
+    # 6) Column format (tight, right-align numerics)
+    colspec = _column_format(work.columns)
+
+    # 7) Build LaTeX longtable (do NOT wrap in table/resizebox)
+    # Use escape=True so underscores, %, etc. are escaped correctly.
+    latex_core = work.to_latex(
         index=False,
-        caption='',
-        label='',
-        column_format="l l l r r r r r r r",
-        escape=False
+        longtable=True,
+        escape=True,
+        column_format=colspec,
+        caption=title,
+        label=f"tab:{out_path.stem}",
+        bold_rows=False,
+        multicolumn=False,
+        multicolumn_format="c",
     )
-  
-    latex_note = "\\vspace{0.2cm}\n\\textit{Note:} \\textbf{***} p$<$0.01, \\textbf{**} p$<$0.05, \\textbf{*} p$<$0.1"
 
-    latex_table = f"""\\begin{{table}}[H]
-\\normalsize
-\\centering
-\\caption{{{caption}}}
-\\label{{{label}}}
-\\resizebox{{\\textwidth}}{{!}}{{
-{inner_table}
-}}
-{latex_note}
-\\end{{table}}"""
+    # 8) A4-fit helpers: zero longtable margins, very small font, very tight col spacing
+    # Wrap in a group so the settings don't leak into the rest of the document.
+    preamble = (
+        "% AUTO-GENERATED by export_regression_table\n"
+        "\\begingroup\n"
+        f"\\setlength\\LTleft{{0pt}}\\setlength\\LTright{{0pt}}\n"
+        f"\\setlength\\tabcolsep{{{tabcolsep_pt}pt}}\n"
+        f"\\{font_size_cmd}\n"
+    )
+    postamble = "\n\\endgroup\n"
 
-    tex_filename = output_path / f"diag_gc_w{w}_{direction}.tex"
-    with open(tex_filename, "w", encoding="utf-8") as f:
-        f.write(latex_table)
-
-    return latex_table
+    # 9) Write .tex
+    out_path.write_text(preamble + latex_core + postamble, encoding="utf-8")
+    return out_path
