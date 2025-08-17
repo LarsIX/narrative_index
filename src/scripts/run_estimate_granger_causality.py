@@ -188,7 +188,7 @@ def run_all_versions(
             version=v,
             aini_file=None,
             p_ret=p_ret,
-            p_x=3,  # overridden by p_x_range
+            p_x=3, 
             p_x_range=p_x_range,
             n_boot=n_boot,
             weight_dist=weight_dist,

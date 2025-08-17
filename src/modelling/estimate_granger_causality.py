@@ -177,6 +177,9 @@ def _process_ticker_variant(
 ) -> List[Dict]:
     """
     Run both directions for a single (ticker, variant) slice and return row dicts.
+    Expands regression coefficients into separate columns with direction prefixes:
+      - A2R_beta_* for AINI → Return
+      - R2A_beta_* for Return → AINI
     """
     out_rows: List[Dict] = []
 
@@ -189,7 +192,9 @@ def _process_ticker_variant(
     ret_lag_cols = [f"ret_lag{i}" for i in range(1, p_ret + 1)]
     xlag_cols = [f"{var}_lag{i}" for i in range(1, p_x + 1)]
 
+    # --------------------------
     # Direction: AINI → Return
+    # --------------------------
     y_r = df_v["log_return"]
     XR = df_v[ret_lag_cols]
     XU = df_v[ret_lag_cols + xlag_cols]
@@ -208,13 +213,24 @@ def _process_ticker_variant(
                              cov=("HAC" if use_hac else "HC3"),
                              hac_lags=_hac_lags)
             F_stat, p_analytic, df_num, df_den = _wald_F_for_zero_coefs(res_u, xlag_cols)
-            betas_dict = res_u.params.to_dict()
-            
+            coef_dict = {}
+            for k, v in res_u.params.to_dict().items():
+                if k.startswith(var + "_lag"):           # AINI lags
+                    lagnum = k.split("lag")[-1]
+                    coef_dict[f"A2R_beta_x_lag{lagnum}"] = v
+                elif k.startswith("ret_lag"):            # return lags
+                    lagnum = k.split("lag")[-1]
+                    coef_dict[f"A2R_beta_ret_lag{lagnum}"] = v
+                elif k == "const":
+                    coef_dict["A2R_beta_const"] = v
+                else:
+                    coef_dict[f"A2R_beta_{k}"] = v
         except Exception:
             res_u = None
             F_stat, p_analytic = np.nan, np.nan
             df_num = len(xlag_cols)
             df_den = max(1, len(sub_r) - (1 + len(ret_lag_cols) + len(xlag_cols)))
+            coef_dict = {}
 
         seed = int((abs(hash((str(year_key), str(ticker), var, "A2R"))) % (2**31 - 1)) + base_seed)
         try:
@@ -237,7 +253,7 @@ def _process_ticker_variant(
             "AINI_variant": var,
             "Year": year_key,
             "Direction": "AINI_to_RET",
-            "betas": betas_dict,
+            **coef_dict,
             "p_x": p_x,
             "N_obs": len(sub_r),
             "N_boot": n_boot,
@@ -251,7 +267,9 @@ def _process_ticker_variant(
             "adj_r2_u": getattr(res_u, "rsquared_adj", np.nan),
         })
 
+    # --------------------------
     # Direction: Return → AINI
+    # --------------------------
     y_x = df_v[var]
     XR2 = df_v[xlag_cols] if xlag_cols else pd.DataFrame(index=df_v.index)
     XU2 = pd.concat([XR2, df_v[ret_lag_cols]], axis=1) if ret_lag_cols else XR2
@@ -272,12 +290,24 @@ def _process_ticker_variant(
                              cov=("HAC" if use_hac else "HC3"),
                              hac_lags=_hac_lags)
             F_stat, p_analytic, df_num, df_den = _wald_F_for_zero_coefs(res_u, ret_lag_cols)
-            betas_dict = res_u.params.to_dict()
+            coef_dict = {}
+            for k, v in res_u.params.to_dict().items():
+                if k.startswith(var + "_lag"):           # AINI lags
+                    lagnum = k.split("lag")[-1]
+                    coef_dict[f"R2A_beta_x_lag{lagnum}"] = v
+                elif k.startswith("ret_lag"):            # return lags
+                    lagnum = k.split("lag")[-1]
+                    coef_dict[f"R2A_beta_ret_lag{lagnum}"] = v
+                elif k == "const":
+                    coef_dict["R2A_beta_const"] = v
+                else:
+                    coef_dict[f"R2A_beta_{k}"] = v
         except Exception:
             res_u = None
             F_stat, p_analytic = np.nan, np.nan
             df_num = len(ret_lag_cols)
             df_den = max(1, len(sub_x) - (1 + len(xlag_cols) + len(ret_lag_cols)))
+            coef_dict = {}
 
         seed = int((abs(hash((str(year_key), str(ticker), var, "R2A"))) % (2**31 - 1)) + base_seed)
         try:
@@ -300,7 +330,7 @@ def _process_ticker_variant(
             "AINI_variant": var,
             "Year": year_key,
             "Direction": "RET_to_AINI",
-            "betas": betas_dict,
+            **coef_dict,
             "p_x": p_x,
             "N_obs": len(sub_x),
             "N_boot": n_boot,
