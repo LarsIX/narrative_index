@@ -120,6 +120,7 @@ AI_narrative_index/
 │   │   ├── estimate_transfer_entropy.py        # Estimate Transfer Entropy between AINI and financial variables
 │   │   ├── estimate_granger_causality.py       # Estimate Granger causality with heteroskedasticity-aware bootstrapping
 │   │   ├── estimate_OLS.py                     # Estimate OLS for same-day returns with heteroskedasticity-aware bootstrapping
+│   │   ├── compute_extrema.py                  # Compute extrema (max / min) of AINI variables by date
 │   │   └── construct_AINI_variables.py         # Build daily AINI index with normalization, EMA etc.
 │   │
 │   ├── visualizations/
@@ -150,6 +151,7 @@ AI_narrative_index/
 │       ├── train_FinBERT_annot.ipynb          # Fine-tune FinBERT on AI-relatedness labels
 │       ├── explore_FinBERT_annotat.ipynb      # Inspect FinBERT predictions across configurations
 │       ├── exploratory_analysis_wsj.ipynb     # Explore WSJ article dataset and structure
+│       ├── exploratory_analysis_results.ipynb # Explore AINI estimates
 │       ├── sample_articles.ipynb              # Sample articles for manual annotation
 │       ├── label_manually.ipynb               # Manually annotate AI relevance and sentiment 
 │       ├── benchmark_windows.ipynb            # Benchmarks naive AI windows against manual annotation

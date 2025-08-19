@@ -71,6 +71,14 @@ patterns_to_remove = [
     r"Check it out at wsj\.compodcasts.*?",
     r"For more\. WSJ.*?(sign up|check it out|wherever you listen).*",
     r"Editor's note.*?Wall\. Street\. Journal\.",
+
+     # Stray teaser fragments
+    r"China'?s trillion-yuan gamble on.*",                     
+    r"China'?s tech giants.*alliances.*",    
+    r"AI and chips is creating strange bedfellows.*",
+    r"Employees'? days are bleeding.*",      
+    r"The startup, growing frustrated.*",
+    r"Huawei's with rival\. SMIC, for one to build a parallel ecosystem",    
 ]
 
 # === Compile patterns once for performance ===

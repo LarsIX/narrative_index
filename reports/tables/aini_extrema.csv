@@ -1,0 +1,25 @@
+,type,date,n measures,measure
+0,minimum,06.02.2025,8,"normalized_AINI_w0, EMA_02_w0, EMA_08_w0, normalized_AINI_w2, EMA_02_w2, EMA_08_w2, EMA_02_custom, EMA_08_custom"
+1,minimum,04.02.2025,2,"simple_AINI_w0, simple_AINI_custom"
+2,minimum,10.04.2023,1,normalized_AINI_w1
+3,minimum,15.07.2023,1,normalized_AINI_custom
+4,minimum,10.08.2023,1,EMA_02_w1
+5,minimum,22.10.2023,1,EMA_08_w1
+6,minimum,21.11.2024,1,simple_AINI_w1
+7,minimum,05.02.2025,1,simple_AINI_w2
+8,minimum,01.04.2023,0,
+9,minimum,21.06.2024,0,
+10,minimum,13.02.2025,0,
+11,minimum,16.06.2025,0,
+12,maximum,16.06.2025,6,"normalized_AINI_w1, EMA_02_w1, EMA_08_w1, normalized_AINI_w2, EMA_02_w2, EMA_08_w2"
+13,maximum,01.04.2023,4,"normalized_AINI_custom, simple_AINI_custom, EMA_02_custom, EMA_08_custom"
+14,maximum,21.06.2024,3,"normalized_AINI_w0, EMA_02_w0, EMA_08_w0"
+15,maximum,13.02.2025,3,"simple_AINI_w0, simple_AINI_w1, simple_AINI_w2"
+16,maximum,10.04.2023,0,
+17,maximum,15.07.2023,0,
+18,maximum,10.08.2023,0,
+19,maximum,22.10.2023,0,
+20,maximum,21.11.2024,0,
+21,maximum,04.02.2025,0,
+22,maximum,05.02.2025,0,
+23,maximum,06.02.2025,0,
