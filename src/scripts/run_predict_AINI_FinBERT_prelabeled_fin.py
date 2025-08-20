@@ -41,17 +41,13 @@ def run(
     Notes
     -----
     - Results are saved as CSV files in the `data/processed/variables/` directory.
-    - The function `predict_sentiment` must be implemented in `your_module.predict_sentiment`
-      and should return a dictionary containing at least:
-        - `"output_path"` : str
-        - `"device"` : str
 
     Examples
     --------
     Run for a specific year:
     python scripts/run_predict_AINI_FinBERT_prelabeled_fin.py run year 2024
 
-    Run for all predefined years:
+    Run for all predefined years:   
     python run_predict_AINI_FinBERT_prelabeled_fin.py run
     """
     if year is None:
