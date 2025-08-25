@@ -85,11 +85,7 @@ Supports both directions: `AINI ➝ returns` and `returns ➝ AINI`.
 
 ## Project Structure
 
-### Code
-<pre>
-## Project Structure
-
-<pre>
+```text
 AI_narrative_index/
 │
 ├── src/
@@ -177,7 +173,7 @@ AI_narrative_index/
 │
 └── models/                                    # Store fine-tuned FinBERT and sentiment models
 
-</pre>
+```
 
 # Data Catalogue 
 
