@@ -178,44 +178,8 @@ AI_narrative_index/
 └── models/                                    # Store fine-tuned FinBERT and sentiment models
 
 </pre>
----
 
-### Scraping Pipeline – Overview
-
-This pipeline collects **Wall Street Journal (WSJ) articles** and stores them in a structured SQLite database for downstream analysis.
-
-
-1. **Metadata Crawling (requests + BeautifulSoup)**
-   - Navigates WSJ archive pages by date and page.
-   - Extracts metadata: headline, timestamp, section, link.
-   - Filters articles by allowed sections (e.g., business, markets, politics).
-   - Logs exploration results (date, page, #articles).
-   - Inserts metadata into `articles_index`.
-
-2. **Full Article Scraping (Selenium)**
-   - Loads article URLs from the database (`articles_index` where `scanned_status=0`).
-   - Handles cookie banners automatically.
-   - Extracts title, subtitle, and full text from multiple possible layouts.
-   - Stores results in the `article` table and marks metadata as scanned.
-
-3. **Database Structure**
-   - **articles_index**: metadata + URLs.
-   - **article**: full text, title, subtitle, linked via `index_id`.
-   - **exploration**: crawl logs for traceability.
-
-## Key Features
-- Duplicate link checking to avoid redundant entries.
-- Section filtering to focus on relevant financial/political content.
-- Flexible crawling (daily/yearly).
-- Logging of excluded/no-content pages.
-- Browser-based scraping to bypass WSJ paywall and dynamic layouts.
-
----
-title: "Data Catalogue"
-output: github_document
----
-
-# Data Catalogue (MLOps-Compliant)
+# Data Catalogue 
 
 This catalogue documents datasets used and produced in the **AI Narrative Index (AINI)** project.  
 It is structured according to **MLOps best practices**:  
@@ -224,7 +188,6 @@ It is structured according to **MLOps best practices**:
 - **Versioning**: datasets with `{year}` or `{vers}` placeholders ensure temporal/version separation.  
 - **Auditability**: provenance of all transformations is documented.  
 
----
 
 ## 📂 `data/raw/`
 
