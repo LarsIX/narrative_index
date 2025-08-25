@@ -288,12 +288,17 @@ def naive_labeling(df, title_col="title", text_col="corpus", output_col="about_a
     """
     ai_keywords = [
         r'\bAI\b', r'\bA\.I\.\b', r'\bAGI\b', r'\bartificial intelligence\b', r'\bartificial general intelligence\b',
-        r'\bhuman-level AI\b', r'\blarge language models?\b', r'\bLLM\b', r'\bmachine learning\b',
-        r'\bsupervised learning\b', r'\breinforcement learning\b', r'\bdeep learning\b',
-        r'\bneural networks?\b', r'\btransformers?\b', r'\bGANs?\b', r'\bgenerative AI\b',
-        r'\bprompt engineering\b', r'\bhallucination\b', r'\bautonomous systems\b',
-        r'\bfoundation models?\b', r'\btraining datasets?\b', r'\bcomputer vision\b',
-        r'\binterpretability\b', r'\bresponsible AI\b', r'\bopen[- ]source\b'
+        r'\bhuman-level AI\b', r'\bhuman-centered artificial intelligence\b', r'\blarge language models?\b',
+        r'\bLLM\b', r'\balgorithmic bias\b', r'\bmachine learning\b', r'\bsupervised learning\b',
+        r'\bunsupervised learning\b', r'\breinforcement learning\b', r'\bdeep learning\b',
+        r'\bneural network\b', r'\bartificial neural network\b', r'\btransformer model\b', r'\btransformers\b',
+        r'\bfine[- ]?tuning\b', r'\bgenerative AI\b', r'\bgenerative adversarial networks?\b', r'\bGANs?\b',
+        r'\bprompt engineering\b', r'\bprompts?\b', r'\bhallucination\b', r'\bautonomous systems\b',
+        r'\bspeech recognition\b', r'\bfacial recognition\b', r'\bsocial chatbots\b', r'\bhuman-robot interaction\b',
+        r'\bautomated decision[- ]making\b', r'\bsuperintelligence\b', r'\bcomputer vision\b', r'\bdeepfakes?\b',
+        r'\bfoundation models?\b', r'\bfrontier AI\b', r'\bgraphical processing units?\b',
+        r'\bGPUs?\b', r'\binterpretability\b', r'\bopen[- ]source\b', r'\bresponsible AI\b',
+        r'\btraining datasets?\b'
     ]
     ai_pattern = re.compile("|".join(ai_keywords), flags=re.IGNORECASE)
 

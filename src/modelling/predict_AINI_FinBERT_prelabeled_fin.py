@@ -81,13 +81,13 @@ def predict_sentiment(
     df["ai_relevant"] = mask_ai
 
     # Prepare text fields
-    for col in ["title", "sub_title", "corpus"]:
+    for col in ["title", "sub_title", "cleaned_corpus"]:
         if col not in df.columns:
             df[col] = ""  # avoid KeyErrors; set missing columns to empty
 
     # Combine title + subtitle (keep small, high-signal)
     df["_head"] = (df["title"].fillna("") + " " + df["sub_title"].fillna("")).str.strip()
-    df["_body"] = df["corpus"].fillna("")
+    df["_body"] = df["cleaned_corpus"].fillna("")
 
     # Init model & tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_name)

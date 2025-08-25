@@ -245,7 +245,7 @@ def extract_multiple_ai_snippets_with_context(
 # Extract multiple AI-related snippets with a variable number of surrounding sentences (context_window) from text and headline
 def extract_multiple_ai_snippets_title_context(
     df,
-    text_col='corpus',
+    text_col='cleaned_corpus',
     output_col='ai_window',
     tokenizer_name='bert-base-uncased',
     max_tokens=512,
@@ -323,7 +323,7 @@ def extract_multiple_ai_snippets_title_context(
         return tokenizer.decode(encoded["input_ids"][0], skip_special_tokens=True)
 
     # track progress
-    tqdm.pandas(desc="🔍 Extracting AI snippets")
+    tqdm.pandas(desc="Extracting AI snippets")
 
     # concatenate title + text
     df["text"] = df["title"] + " "+ df[text_col]
@@ -334,7 +334,7 @@ def extract_multiple_ai_snippets_title_context(
 def extract_human_readable_snippet(
     df,
     title_col="title",
-    text_col="corpus",
+    text_col="cleaned_corpus",
     output_col="ai_window",
     tokenizer_name="bert-base-uncased",
     max_tokens=512,

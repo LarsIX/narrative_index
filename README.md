@@ -78,13 +78,14 @@ Tests predictive causality between AINI and log returns or volatility indices us
 
 Supports both directions: `AINI ➝ returns` and `returns ➝ AINI`.
 
-### Transfer Entropy (TE)
+## Transfer Entropy (TE)
 
 - KSG estimator for nonlinear, asymmetric dependencies
 - IDTxl framework with permutation-based significance testing
 
 ## Project Structure
 
+### Code
 <pre>
 ## Project Structure
 
@@ -113,15 +114,17 @@ AI_narrative_index/
 │   │
 │   ├── modelling/
 │   │   ├── ai_windows.py                       # Extract context-aware snippets around AI keywords
-│   │   ├── predict_binary_AINI_FinBERT.py      # Classify articles (AI-related vs. not) using custom FinBERT
-│   │   ├── predict_AINI_FinBERT_window.py      # Classify with windowed context using FinBERT
+│   │   ├── calculate_summary_statistics.py     # Calculates summary statistics of AINI values
+│   │   ├── compute_extrema.py                  # Compute extrema (max / min) of AINI variables by date
+│   │   ├── construct_AINI_variables.py         # Build daily AINI index with normalization, EMA etc.
 │   │   ├── CustomFinBERT.py                    # Define custom FinBERT model with dropout & class weights
 │   │   ├── stationarity_testing.py             # Perform ADF and PP stationarity tests
 │   │   ├── estimate_transfer_entropy.py        # Estimate Transfer Entropy between AINI and financial variables
 │   │   ├── estimate_granger_causality.py       # Estimate Granger causality with heteroskedasticity-aware bootstrapping
 │   │   ├── estimate_OLS.py                     # Estimate OLS for same-day returns with heteroskedasticity-aware bootstrapping
-│   │   ├── compute_extrema.py                  # Compute extrema (max / min) of AINI variables by date
-│   │   └── construct_AINI_variables.py         # Build daily AINI index with normalization, EMA etc.
+│   │   ├── predict_binary_AINI_FinBERT.py      # Classify articles (AI-related vs. not) using custom FinBERT
+│   │   └── predict_AINI_FinBERT_window.py      # Classify with windowed context using FinBERT
+│   │
 │   │
 │   ├── visualizations/
 │   │   ├── construct_latex_tables.py           # Construct latex tables for final thesis
@@ -144,14 +147,14 @@ AI_narrative_index/
 │   │   │── run_estimate_granger_causality.py   # Run function to estimate Granger Causality
 │   │   │── run_estimate_OLS.py                 # Run function to estimate OLS
 │   │   │── run_naive_labeling.py               # Label AI-relavance based on naive keywords
-│       └── run_construct_AINI_variables.py     # Construct final AINI index file for modeling
+│   │   └── run_construct_AINI_variables.py     # Construct final AINI index file for modeling
 │
 ├── notebooks/
 │       ├── compare_annotations.ipynb          # Resolve annotation disagreements interactively
 │       ├── train_FinBERT_annot.ipynb          # Fine-tune FinBERT on AI-relatedness labels
 │       ├── explore_FinBERT_annotat.ipynb      # Inspect FinBERT predictions across configurations
 │       ├── exploratory_analysis_wsj.ipynb     # Explore WSJ article dataset and structure
-│       ├── exploratory_analysis_results.ipynb # Explore AINI estimates
+│       ├── exploratory_analysis_aini.ipynb    # Explore FinBERT predictions & AINI variables
 │       ├── sample_articles.ipynb              # Sample articles for manual annotation
 │       ├── label_manually.ipynb               # Manually annotate AI relevance and sentiment 
 │       ├── benchmark_windows.ipynb            # Benchmarks naive AI windows against manual annotation
@@ -176,6 +179,139 @@ AI_narrative_index/
 
 </pre>
 ---
+
+### Scraping Pipeline – Overview
+
+This pipeline collects **Wall Street Journal (WSJ) articles** and stores them in a structured SQLite database for downstream analysis.
+
+
+1. **Metadata Crawling (requests + BeautifulSoup)**
+   - Navigates WSJ archive pages by date and page.
+   - Extracts metadata: headline, timestamp, section, link.
+   - Filters articles by allowed sections (e.g., business, markets, politics).
+   - Logs exploration results (date, page, #articles).
+   - Inserts metadata into `articles_index`.
+
+2. **Full Article Scraping (Selenium)**
+   - Loads article URLs from the database (`articles_index` where `scanned_status=0`).
+   - Handles cookie banners automatically.
+   - Extracts title, subtitle, and full text from multiple possible layouts.
+   - Stores results in the `article` table and marks metadata as scanned.
+
+3. **Database Structure**
+   - **articles_index**: metadata + URLs.
+   - **article**: full text, title, subtitle, linked via `index_id`.
+   - **exploration**: crawl logs for traceability.
+
+## Key Features
+- Duplicate link checking to avoid redundant entries.
+- Section filtering to focus on relevant financial/political content.
+- Flexible crawling (daily/yearly).
+- Logging of excluded/no-content pages.
+- Browser-based scraping to bypass WSJ paywall and dynamic layouts.
+
+---
+title: "Data Catalogue"
+output: github_document
+---
+
+# Data Catalogue (MLOps-Compliant)
+
+This catalogue documents datasets used and produced in the **AI Narrative Index (AINI)** project.  
+It is structured according to **MLOps best practices**:  
+- **Traceability**: each dataset is linked to its generating script.  
+- **Reproducibility**: raw → interim → final → processed pipeline is explicit.  
+- **Versioning**: datasets with `{year}` or `{vers}` placeholders ensure temporal/version separation.  
+- **Auditability**: provenance of all transformations is documented.  
+
+---
+
+## 📂 `data/raw/`
+
+Raw inputs, immutable once collected.  
+Source of truth for all downstream datasets.
+
+### 📂 `articles/`
+
+| File | Description | Provenance |
+|------|-------------|------------|
+| `articlesWSJ_{year}.db` | WSJ raw databases containing `articles` and `articles_index` | Generated by `create_database.py`, populated via `wsj_archive_scraper.py` & `wsj_archive_crawler.py` |
+
+### 📂 `financial/`
+
+All contain OHLCV financial data: `Date`, `Ticker`, `Open`, `High`, `Low`, `Close`, `Adj Close`, `Volume`.  
+Scraped via `load_financial_data.py`.
+
+| File | Description |
+|------|-------------|
+| `{TICKER}_full_2023_2025.csv` | Daily OHLCV for single ticker (e.g., `AAPL`, `NVDA`, `MSFT`) |
+| `full_daily_2023_2025.csv` | Aggregated OHLCV data for all tickers |
+
+---
+
+## 📂 `data/interim/`
+
+Staging area for experiments, human-in-the-loop tasks, and partially processed data.  
+Used for **annotation, sampling, and benchmarking**.
+
+### Sampling & Annotation
+
+| File | Description | Provenance |
+|------|-------------|------------|
+| `articles_WSJ_batch_{1–4}.csv` | Raw sampled batches for annotation | `sample_articles.ipynb` |
+| `articles_WSJ_sub500.csv` | Initial 500-article subset (basis for batches) | `sample_articles.ipynb` |
+| `articles_WSJ_batch_{n}_annotator.csv` | Professional annotator labels | External annotator → imported |
+| `articles_WSJ_batch_{n}_author.csv` | Author labels | `label_manually.ipynb` |
+| `*_subsample_author.csv` | 25% author-labeled subsample | Manual selection |
+
+---
+
+## 📂 `data/final/`
+
+Canonical datasets ready for **training, evaluation, and benchmarking**.  
+All interim ambiguities (noise, disagreement) resolved.
+
+### 📂 `articles/`
+
+| File | Description | Provenance |
+|------|-------------|------------|
+| `articlesWSJ_clean_{year}.db` | Cleaned WSJ articles (polluting patterns removed) | `clean_database.py` (patterns: `corpus_cleaning.py`) |
+| `annotated_subsample_WSJ_final.csv` | Consensus labels after disagreement resolution | `compare_annotations.ipynb` |
+| `articles_WSJ_batch_{n}_final.csv` | Final reconciled annotation batches | `compare_annotations.ipynb` |
+| `naive_AI_labels_{year}.csv` | Dictionary-based AI relevance labels | `label_articles.py` (`naive_labeling`) |
+
+---
+
+## 📂 `data/processed/`
+
+Derived features and analysis-ready datasets.  
+Supports **downstream modeling & validation**.
+
+| File | Description | Provenance |
+|------|-------------|------------|
+| `{vers}_AINI_variables.csv` | AINI measures (normalized + EMA, relative) | `run_construct_AINI_variables.py` |
+| `extrema.csv` | Min/max AINI values by measure count | `exploratory_analysis_results.ipynb` |
+
+---
+
+## 📂 `data/variables/`
+
+Model outputs, diagnostics, and statistical analysis results.  
+All **results are reproducible** from source code.
+
+| File | Description | Provenance |
+|------|-------------|------------|
+| `w0_AINI_variables.csv`, `w1_AINI_variables.csv`, `w2_AINI_variables.csv`, `binary_AINI_variables.csv` | AINI variables (normalized + EMA α=0.2/0.8) | `construct_AINI_variables.py` |
+| `FinBERT_AINI_prediction_{year}_windowsize_{n}.csv` | Context-window predictions (-1, 0, 1) | `predict_AINI_FinBERT_window.py` |
+| `FinBERT_binary_prediction_{year}.csv` | Binary FinBERT predictions on pre-labeled data | `predict_AINI_FinBERT_prelabeled_fin.py` |
+| `granger_causality_{spec}.csv` | GC results (AINI ↔ returns) with 10k bootstrap + FDR | `estimate_granger_causality.py` |
+| `ols_sameday_mbboot_fdr_{spec}.csv` | Same-day OLS contemporaneous effects | `estimate_OLS.py` |
+| `diagnostics_{spec}.csv` | OLS residual diagnostics (Ljung-Box, BG, ARCH LM, etc.) | `ols_residual_diagnostics.py` |
+| `combined_te_results_window_1.csv` | Transfer Entropy results | `calc_entropy.py` |
+| `extrema.csv` | AINI minima/maxima | `exploratory_analysis_aini.ipynb` |
+
+---
+
 
 ### Note
 

@@ -146,11 +146,11 @@ def label_data(year, batch_size=16):
     annotated_csv = project_root / "data" / "processed" / "articles" / "annotated_subsample_WSJ_final.csv"
     df_annotated = pd.read_csv(annotated_csv)
     df_unlabeled = df[~df["article_id"].isin(df_annotated["article_id"])].copy()
-    df_unlabeled["corpus"] = "Title: " + df_unlabeled["title"] + "\n\n" + df_unlabeled["corpus"]
+    df_unlabeled["cleaned_corpus"] = "Title: " + df_unlabeled["title"] + "\n\n" + df_unlabeled["cleaned_corpus"]
     # Extract snippets
     df_unlabeled = extract_multiple_ai_snippets_with_context(
         df_unlabeled,
-        text_col="corpus",
+        text_col="cleaned_corpus",
         output_col="ai_window",
         context_window=2
     )

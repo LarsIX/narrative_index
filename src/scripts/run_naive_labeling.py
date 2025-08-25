@@ -2,7 +2,7 @@
 CLI app to generate naive AI relevance labels from article files.
 
 Usage:
-    python run_naive_labeling.py 2023 --file articlesWSJ_clean_2023.csv
+    python run_naive_labeling.py 2024 --file articlesWSJ_clean_2024.csv
 """
 
 import typer

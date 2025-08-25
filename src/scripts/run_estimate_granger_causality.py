@@ -7,8 +7,10 @@ CLI for estimating Granger causality (both directions) with **Wild residual boot
     version in {"w0","w1","w2"} -> loads
     AI_narrative_index/data/processed/variables/<version>_AINI_variables.csv
 
-Example:
+Examples:
     python run_estimate_granger_causality.py run --version w1 --p-x-range 1,3 --n-boot 10
+    
+    python run_estimate_granger_causality.py run-all-versions --n-boot 10000
 """
 
 from __future__ import annotations

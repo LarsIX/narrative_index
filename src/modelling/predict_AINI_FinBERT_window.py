@@ -37,7 +37,7 @@ def predict_sentiment(year, batch_size, context_window=1, max_tokens=512):
     # Extract AI-related snippets
     df = extract_multiple_ai_snippets_title_context(
         df,
-        text_col='corpus',
+        text_col='cleaned_corpus',
         output_col='ai_window',
         tokenizer_name='bert-base-uncased',
         max_tokens=max_tokens,

@@ -61,7 +61,6 @@ def build_df(df_1, df_2, df_3=None, df_4=None, cutoff_min=None, cutoff_max=None,
     final_df["EMA_08"] = final_df["normalized_AINI"].ewm(alpha=0.8, adjust=False).mean()
 
     final_df = final_df.sort_values("date").set_index("date")
-    final_df["normalized_AINI_growth"] = final_df["normalized_AINI"].diff()
     final_df = final_df.reset_index()
 
     typer.echo(f"Created dataframe with {len(final_df)} observations.")
