@@ -225,7 +225,7 @@ Used for **annotation, sampling, and benchmarking**.
 
 ---
 
-## 📂 `data/final/`
+## 📂 `data/processed/`
 
 Canonical datasets ready for **training, evaluation, and benchmarking**.  
 All interim ambiguities (noise, disagreement) resolved.
@@ -237,23 +237,11 @@ All interim ambiguities (noise, disagreement) resolved.
 | `articlesWSJ_clean_{year}.db` | Cleaned WSJ articles (polluting patterns removed) | `clean_database.py` (patterns: `corpus_cleaning.py`) |
 | `annotated_subsample_WSJ_final.csv` | Consensus labels after disagreement resolution | `compare_annotations.ipynb` |
 | `articles_WSJ_batch_{n}_final.csv` | Final reconciled annotation batches | `compare_annotations.ipynb` |
-| `naive_AI_labels_{year}.csv` | Dictionary-based AI relevance labels | `label_articles.py` (`naive_labeling`) |
+
 
 ---
 
-## 📂 `data/processed/`
-
-Derived features and analysis-ready datasets.  
-Supports **downstream modeling & validation**.
-
-| File | Description | Provenance |
-|------|-------------|------------|
-| `{vers}_AINI_variables.csv` | AINI measures (normalized + EMA, relative) | `run_construct_AINI_variables.py` |
-| `extrema.csv` | Min/max AINI values by measure count | `exploratory_analysis_results.ipynb` |
-
----
-
-## 📂 `data/variables/`
+## 📂 `variables/`
 
 Model outputs, diagnostics, and statistical analysis results.  
 All **results are reproducible** from source code.
@@ -268,6 +256,9 @@ All **results are reproducible** from source code.
 | `diagnostics_{spec}.csv` | OLS residual diagnostics (Ljung-Box, BG, ARCH LM, etc.) | `ols_residual_diagnostics.py` |
 | `combined_te_results_window_1.csv` | Transfer Entropy results | `calc_entropy.py` |
 | `extrema.csv` | AINI minima/maxima | `exploratory_analysis_aini.ipynb` |
+| `{vers}_AINI_variables.csv` | AINI measures (normalized + EMA, relative) | `run_construct_AINI_variables.py` |
+| `extrema.csv` | Min/max AINI values by measure count | `exploratory_analysis_results.ipynb` |
+| `naive_AI_labels_{year}.csv` | Dictionary-based AI relevance labels | `label_articles.py` (`naive_labeling`) |
 
 ---
 
