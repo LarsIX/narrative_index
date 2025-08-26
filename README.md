@@ -259,6 +259,7 @@ All **results are reproducible** from source code.
 | `{vers}_AINI_variables.csv` | AINI measures (normalized + EMA, relative) | `run_construct_AINI_variables.py` |
 | `extrema.csv` | Min/max AINI values by measure count | `exploratory_analysis_results.ipynb` |
 | `naive_AI_labels_{year}.csv` | Dictionary-based AI relevance labels | `label_articles.py` (`naive_labeling`) |
+| `n_articles.csv` | article count per day | `exploratory_analysis_aini.ipynb`|
 
 ---
 
