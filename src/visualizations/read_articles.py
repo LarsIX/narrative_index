@@ -8,79 +8,74 @@ from ai_windows import extract_multiple_ai_snippets_title_context
 from typing import Literal, Optional
 import re
 
-def _format_text(text: str, width: int = 100) -> str:
-    """Wrap text for readability."""
-    return "\n".join(textwrap.wrap(str(text if text is not None else ""), width=width))
 
+def _format_text(text: object, width: int) -> str:
+    """Wrap text, preserving paragraph breaks."""
+    if text is None or (isinstance(text, float) and pd.isna(text)):
+        return ""
+    s = str(text)
+    paras = [p.strip() for p in s.split("\n") if p.strip()]
+    return "\n\n".join(textwrap.fill(p, width=width) for p in paras)
 
 def read(
     df: pd.DataFrame,
     wrap_width: int = 100,
-    window: bool = True,
-    context_window: int = 2,
     require_nonzero_hype: bool = True,
 ) -> None:
     """
     Interactive article reader (Jupyter/console).
 
+    Expects df with (at least):
+      - 'date', 'article_id'
+      - hype scores: 'hype_score_w0', 'hype_score_w1', 'hype_score_w2', 'hype_score_c'
+      - AI windows: any columns starting with 'ai_window' (e.g., 'ai_window',
+                    'ai_window_w1', 'ai_window_w2', 'ai_window_c', 'ai_window_t')
+
+    Shows:
+      - date, article_id
+      - hype_score_w0, hype_score_w1, hype_score_w2, hype_score_c
+      - all ai_window* columns (printed in sorted column-name order)
+
     Parameters
     ----------
     df : pd.DataFrame
-        Must contain at least: title, date, section, cleaned_corpus.
-        Hype columns are optional: hype_score, hype_score_w0, hype_score_w1, hype_score_w2.
     wrap_width : int
-        Line width for wrapping text.
-    window : bool
-        If True, compute and display AI-focused snippets; otherwise show full cleaned_corpus.
-    context_window : int
-        Context window passed to snippet extractor (when window=True).
+        Line width for wrapping AI window text.
     require_nonzero_hype : bool
-        If True, only show rows where any hype column != 0.
+        If True, only show rows where ANY hype score != 0.
     """
-    # --- Validate & copy early to avoid mutating caller ---
-    required = ["title", "date", "section", "cleaned_corpus"]
-    missing = [c for c in required if c not in df.columns]
+    # --- Validate minimal structure, but don't mutate caller ---
+    required_base = ["date", "article_id"]
+    required_hype = ["hype_score_w0", "hype_score_w1", "hype_score_w2", "hype_score_c"]
+
+    missing = [c for c in required_base + required_hype if c not in df.columns]
     if missing:
-        raise ValueError(f"Missing column(s): {missing}")
-    df = df.copy()
+        raise ValueError(f"Missing required column(s): {missing}")
 
-    # --- Normalize hype cols (optional, float-safe) ---
-    hype_cols = [c for c in df.columns if c in ("hype_score", "hype_score_w0", "hype_score_w1", "hype_score_w2","hype_score_c")]
-    if not hype_cols:
-        # create a single hype column so downstream code is stable
-        df["hype_score"] = 0.0
-        hype_cols = ["hype_score"]
+    ai_window_cols = sorted([c for c in df.columns if c.startswith("ai_window")])
+    if not ai_window_cols:
+        raise ValueError("No AI window columns found (expected at least one 'ai_window*').")
 
-    for c in hype_cols:
-        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
+    data = df.copy()
 
-    # --- Optional filter: keep rows where ANY hype col != 0 ---
+    # Ensure types for display
+    for c in required_hype:
+        data[c] = pd.to_numeric(data[c], errors="coerce").fillna(0.0)
+
+    # Optional filter on nonzero hype
     if require_nonzero_hype:
-        mask = (df[hype_cols] != 0).any(axis=1)
-        df = df.loc[mask].reset_index(drop=True)
+        mask = (data[required_hype] != 0).any(axis=1)
+        data = data.loc[mask].reset_index(drop=True)
 
-    n_articles = len(df)
+    # Basic sort for deterministic traversal (by date if present)
+    if "date" in data.columns:
+        data = data.sort_values("date").reset_index(drop=True)
+
+    n_articles = len(data)
     if n_articles == 0:
         print("No articles to display (empty after filtering).")
         return
 
-    # --- Precompute snippets ONCE if requested and not already present ---
-    if window:
-        if "ai_window" not in df.columns:
-            df = extract_human_readable_snippet(
-                df=df,
-                title_col="title",
-                text_col="cleaned_corpus",
-                output_col="ai_window",
-                tokenizer_name="bert-base-uncased",
-                max_tokens=512,
-                context_window=context_window,
-            )
-        text_col_to_show = "ai_window"
-    else:
-        text_col_to_show = "cleaned_corpus"
-
-    # --- Interactive loop ---
     i = 0
     try:
         while True:
@@ -89,17 +84,29 @@ def read(
             elif i >= n_articles:
                 i = n_articles - 1
 
-            row = df.iloc[i]
+            row = data.iloc[i]
 
             print("=" * 80)
-            print(f"Title   : {row.get('title', '')}")
-            print(f"Date    : {row.get('date', '')}")
-            print(f"Section : {row.get('section', '')}")
-            # Scores
-            scores = ", ".join(f"{c}={row.get(c, 0)}" for c in hype_cols)
-            print(f"Scores  : {scores}")
+            print(f"Date       : {row.get('date', '')}")
+            print(f"Article ID : {row.get('article_id', '')}")
+            print(
+                "Hype       : "
+                f"w0={row.get('hype_score_w0', 0):.3f}, "
+                f"w1={row.get('hype_score_w1', 0):.3f}, "
+                f"w2={row.get('hype_score_w2', 0):.3f}, "
+                f"c={row.get('hype_score_c', 0):.3f}"
+            )
             print("-" * 80)
-            print(_format_text(row.get(text_col_to_show, ""), wrap_width))
+
+            # Print all available AI windows
+            for col in ai_window_cols:
+                txt = row.get(col, "")
+                if pd.isna(txt) or str(txt).strip() == "":
+                    continue
+                print(f"[{col}]")
+                print(_format_text(txt, wrap_width))
+                print("-" * 80)
+
             print("=" * 80)
             print(f"Article {i+1} of {n_articles}")
 
@@ -121,6 +128,7 @@ def read(
                 print("Invalid command. Use n, p, or s.")
     except KeyboardInterrupt:
         print("\nStopping reader (KeyboardInterrupt).")
+
 
 
 def _ensure_ai_windows(df: pd.DataFrame, *, context_window: int, max_tokens: int = 512) -> pd.DataFrame:

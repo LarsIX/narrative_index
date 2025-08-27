@@ -10,7 +10,7 @@ The modelling function writes its own CSV:
     granger_causality_{control_var}_{version}.csv
 
 Example usage:
-python run_estimate_granger_causality.py run-all-versions --versions "binary,w0,w1,w2" --control-var n_articles --controls-file data/processed/variables/n_articles.csv --controls-lags n_articles --p-x-range 1,3 --controls-align-with-px --n-boot 1 --min-obs 0 --outdir data/processed/variables
+python run_estimate_granger_causality.py run-all-versions --versions "w1,w2" --control-var n_articles --controls-file data/processed/variables/n_articles.csv --controls-lags n_articles --p-x-range 1,3 --controls-align-with-px --n-boot 1 --min-obs 0 --outdir data/processed/variables
 
 
 """
@@ -169,11 +169,11 @@ def run(
 
     # --- Save exactly one CSV ---
     if outdir is None:
-        outdir = src_dir.parent / "data" / "processed" / "variables"
+        outdir = root_dir / "data" / "processed" / "variables"
     outdir.mkdir(parents=True, exist_ok=True)
 
     outname = f"granger_causality_{control_var}_{version}.csv" if use_controls else f"granger_causality_{version}.csv"
-    outpath = outdir / outname
+    outpath = root_dir / outdir / outname
     combined.to_csv(outpath, index=False)
     typer.echo(f"[SAVE] {outpath}")
 

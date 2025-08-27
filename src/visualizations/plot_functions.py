@@ -1,61 +1,44 @@
 import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from matplotlib.dates import AutoDateLocator, ConciseDateFormatter
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Sequence, Union
-from pathlib import Path
-from typing import Optional, Tuple, Sequence
+from typing import Dict, Optional, Sequence, Union,Tuple, List
 import numpy as np
+import re
 
 
-
-def plot_aini_series_subplots(
+def plot_aini_means_three_panels(
     df: pd.DataFrame,
     date_col: str = "date",
-    bases: Sequence[str] = ("normalized_AINI", "EMA_02", "EMA_08"),
-    suffixes: Sequence[str] = ("w0", "w1", "w2"),
-    window_labels: Optional[Dict[str, str]] = None,   # e.g. {"w0":"±0d","w1":"±1d","w2":"±2d"}
+    series_top: Sequence[str] = ("w0_mean", "c_mean"),
+    series_mid: Sequence[str] = ("w1_mean", "w2_mean"),
+    series_bot: Sequence[str] = ("w0_mean", "w1_mean"),
+    labels: Optional[Dict[str, str]] = None,   # e.g. {"w0_mean":"w0 (mean)", ...}
+    colors: Optional[Dict[str, str]] = None,   # override if you like
     events: Optional[Dict[str, Union[str, pd.Timestamp]]] = None,
-    event_style: Optional[Dict] = None,               # overrides for vlines/text
+    event_style: Optional[Dict] = None,        # vline styling
     dpi: int = 300,
-    figsize: tuple = (12, 7.5),
-    outpath: Optional[Union[str, Path]] = None,       # if given, saves PNG; use outpaths to write PDF/SVG too
-    outpaths_vector: Optional[Dict[str, Union[str, Path]]] = None,  # {"pdf":"fig.pdf","svg":"fig.svg"}
-    ylabels: Optional[Dict[str, str]] = None,         # per-base y-axis labels
-    title: str = "AINI Time Series with Key AI Events",
+    figsize: tuple = (12, 7.2),
+    outpath: Optional[Union[str, Path]] = None,
+    outpaths_vector: Optional[Dict[str, Union[str, Path]]] = None,  # {"pdf":"...","svg":"..."}
+    y_label: str = "AINI (means)",
+    title: str = "AINI means by variant",
     grid: bool = True,
     linewidth: float = 1.8,
     alpha: float = 0.95,
-    rc_update: Optional[Dict] = None,                 # e.g. {"font.size":11, "axes.titlesize":12}
+    rc_update: Optional[Dict] = None,
 ):
     """
-    Plot {bases} by date for each suffix in {suffixes} in stacked subplots.
-    Designed for scientific reporting: clean formatting, reproducible defaults,
-    robust to missing series, and vector export.
+    Three stacked subplots with identical x/y scales:
+      - Top   : w0_mean & c_mean
+      - Middle: w1_mean & w2_mean
+      - Bottom: w0_mean & w1_mean
 
-    Parameters
-    ----------
-    df : DataFrame with a date column and columns like f"{base}_{suffix}".
-    date_col : datetime-like column name.
-    bases : base variable names to plot (rows).
-    suffixes : context windows (series per subplot).
-    window_labels : mapping from suffix -> legend label (defaults to suffix).
-    events : mapping {label: date} where date is 'YYYY-MM-DD' or pd.Timestamp.
-             Defaults include Sam Altman firing and DeepSeek emergence.
-    event_style : dict to override line/text styling for events.
-    dpi, figsize : rendering settings.
-    outpath : if set, saves PNG here.
-    outpaths_vector : optional dict to additionally save PDF/SVG, e.g. {"pdf": ".../figure.pdf"}.
-    ylabels : optional per-base y-axis labels.
-    title : figure title.
-    grid : toggle subplot grid.
-    linewidth, alpha : series aesthetics.
-    rc_update : optional rcParams overrides.
+    Event labels are horizontal, bottom-aligned near the x-axis under each vline.
     """
 
-    # ---- Reproducible, neutral style (no seaborn) ----
-    # Narrow, journal-friendly defaults; user can override via rc_update.
     rc_defaults = {
         "figure.dpi": dpi,
         "savefig.dpi": dpi,
@@ -68,119 +51,134 @@ def plot_aini_series_subplots(
     }
     if rc_update:
         rc_defaults.update(rc_update)
-    with mpl.rc_context(rc_defaults):
 
-        # ---- Input prep ----
-        df = df.copy()
+    with mpl.rc_context(rc_defaults):
+        # ---- Prep ----
         if date_col not in df.columns:
             raise ValueError(f"date_col '{date_col}' not found in DataFrame.")
-        df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
-        df = df.sort_values(date_col)
 
-        # Default labels for windows
-        if window_labels is None:
-            window_labels = {s: s for s in suffixes}
+        needed_cols = list(series_top) + list(series_mid) + list(series_bot)
+        missing = [c for c in needed_cols if c not in df.columns]
+        if missing:
+            raise ValueError(f"Missing columns: {missing}")
 
-        # Default events if none provided (you can extend/replace)
-        if events is None:
-            events = {
-                "Sam Altman fired": "2023-11-17",
-                # If you want “GPT-5 rumors”, add the most defensible date you track.
-                "DeepSeek emerges": "2025-01-20",
-            }
-        # Parse event dates
+        data = df.copy()
+        data[date_col] = pd.to_datetime(data[date_col], errors="coerce")
+        data = data.sort_values(date_col)
+
+        # Labels
+        if labels is None:
+            labels = {s: s for s in needed_cols}
+
+        # Color-blind friendly Okabe–Ito palette
+        default_palette = {
+            "w0_mean": "#0072B2",  # blue
+            "c_mean" : "#D55E00",  # vermillion
+            "w1_mean": "#E69F00",  # orange
+            "w2_mean": "#009E73",  # green
+        }
+        if colors is None:
+            colors = default_palette.copy()
+        else:
+            # fill any missing with sensible defaults
+            for k, v in default_palette.items():
+                colors.setdefault(k, v)
+
+        # --- Event markers ---
+    if events is None:
+        events = {
+            "Sam Altman fired": "2023-11-17",
+            "EU AI Act: Start of rollout": "2024-08-01",
+            "DeepSeek emerges": "2025-01-20",
+        }
         events = {k: pd.to_datetime(v) for k, v in events.items()}
-
-        # Event styling defaults
         evt_style = dict(color="red", linestyle="--", alpha=0.7, linewidth=1.2)
         if event_style:
             evt_style.update(event_style)
 
-        # Color-blind friendly palette for up to 3 series
-        # (okabe-ito): blue, orange, green
-        palette = {
-            "w0": "#0072B2",  # blue
-            "w1": "#E69F00",  # orange
-            "w2": "#009E73",  # green
-            "custom":"#9E0008",  # green
-        }
-        # Fallbacks if more suffixes than keys
-        default_colors = list(palette.values()) + ["#D55E00", "#CC79A7", "#56B4E9", "#F0E442"]
-        color_map = {}
-        for i, s in enumerate(suffixes):
-            color_map[s] = palette.get(s, default_colors[i % len(default_colors)])
+        # ---- Common ranges ----
+        x_min = data[date_col].min()
+        x_max = data[date_col].max()
 
-        # ---- Figure & axes ----
-        nrows = len(bases)
-        fig, axes = plt.subplots(nrows, 1, figsize=figsize, sharex=True)
-        if nrows == 1:
-            axes = [axes]
+        y_vals = []
+        for col in needed_cols:
+            y_vals.extend(pd.to_numeric(data[col], errors="coerce").dropna().tolist())
 
-        # Date axis formatter: compact and journal-friendly
+        if not y_vals:
+            raise ValueError("All selected series are empty.")
+
+        y_arr = np.asarray(y_vals, dtype=float)
+        y_min = float(np.nanmin(y_arr))
+        y_max = float(np.nanmax(y_arr))
+        if not (np.isfinite(y_min) and np.isfinite(y_max)):
+            raise ValueError("Y values contain no finite numbers after coercion.")
+        if y_min == y_max:
+            pad = 0.5 if y_min == 0 else abs(y_min) * 0.05
+            y_min, y_max = y_min - pad, y_max + pad
+
+        # ---- Figure ----
+        fig, axes = plt.subplots(3, 1, figsize=figsize, sharex=True)
         locator = AutoDateLocator(minticks=4, maxticks=8)
         formatter = ConciseDateFormatter(locator)
 
-        # ---- Plot each base ----
-        for i, base in enumerate(bases):
-            ax = axes[i]
-            plotted_any = False
-
-            for suf in suffixes:
-                col = f"{base}_{suf}"
-                if col in df.columns and df[col].notna().any():
+        def _plot_panel(ax, series_names):
+            plotted = False
+            for name in series_names:
+                s = pd.to_numeric(data[name], errors="coerce")
+                if s.notna().any():
                     ax.plot(
-                        df[date_col],
-                        df[col],
-                        label=window_labels.get(suf, suf),
-                        color=color_map[suf],
+                        data[date_col], s,
+                        label=labels.get(name, name),
+                        color=colors.get(name, "#333333"),
                         linewidth=linewidth,
                         alpha=alpha,
                     )
-                    plotted_any = True
+                    plotted = True
 
-            # Axes labels and grid
-            ax.set_ylabel((ylabels or {}).get(base, base), labelpad=6)
-
-            # Legend only if something was plotted for this subplot
-            if plotted_any:
-                ax.legend(title="Window", ncol=min(3, len(suffixes)), loc="upper left")
-            else:
-                # If nothing to show, make it apparent in the plot area
-                ax.text(
-                    0.5, 0.5, f"No data for base '{base}'",
-                    transform=ax.transAxes, ha="center", va="center", fontsize=10
-                )
-
-            # Event markers: draw after data so they’re visible
-            # Use axis fraction for y to avoid overlap with data ranges
-            ax_ymin, ax_ymax = ax.get_ylim()
-            y_top = ax_ymax - 0.02 * (ax_ymax - ax_ymin)
-            v_spacing = 0.08 * (ax_ymax - ax_ymin)
-            for j, (label, date) in enumerate(events.items()):
-                ax.axvline(date, **evt_style)
-                # Annotate just below the top; rotate for space efficiency
-                ax.annotate(
-                    label,
-                    xy=(date, y_top - j * v_spacing),
-                    xytext=(5, 0),
-                    textcoords="offset points",
-                    rotation=90,
-                    va="top",
-                    fontsize=9,
-                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.7, pad=1)
-                )
-
-            # Dates
+            ax.set_ylabel(y_label, labelpad=6)
+            ax.set_xlim(x_min, x_max)
+            ax.set_ylim(y_min, y_max)
             ax.xaxis.set_major_locator(locator)
             ax.xaxis.set_major_formatter(formatter)
 
-        axes[-1].set_xlabel("Date")
+            # Events: vlines + bottom-aligned horizontal labels
+            y_bottom = y_min + 0.04 * (y_max - y_min)  # close to x-axis, same height for alignment
+            for lab, d in events.items():
+                ax.axvline(d, **evt_style)
+                ax.annotate(
+                    lab,
+                    xy=(d, y_bottom),
+                    xytext=(0, 2),  # slight upward offset in points
+                    textcoords="offset points",
+                    rotation=0,
+                    ha="center", va="bottom",
+                    fontsize=9,
+                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.7, pad=1),
+                )
 
-        # Title and layout
+            if plotted:
+                ax.legend(
+                    ncol=min(3, len(series_names)),
+                    loc="lower left",
+                    fontsize=9,
+                    frameon=False,
+                    bbox_to_anchor=(0.02, 0.02),  # shift inside the axes
+                    borderaxespad=0.0,
+                )
+
+            else:
+                ax.text(0.5, 0.5, "No data", transform=ax.transAxes, ha="center", va="center")
+
+        # Panels
+        _plot_panel(axes[0], series_top)   # w0_mean & c_mean
+        _plot_panel(axes[1], series_mid)   # w1_mean & w2_mean
+        _plot_panel(axes[2], series_bot)   # w0_mean & w1_mean
+
+        axes[-1].set_xlabel("Date")
         fig.suptitle(title, y=0.995)
         fig.tight_layout(rect=[0, 0, 1, 0.97])
 
-        # ---- Saving ----
+        # ---- Save ----
         def _ensure_parent(p: Path):
             p.parent.mkdir(parents=True, exist_ok=True)
 
@@ -190,12 +188,13 @@ def plot_aini_series_subplots(
             fig.savefig(outpath, bbox_inches="tight")
 
         if outpaths_vector:
-            for ext, p in outpaths_vector.items():
+            for _, p in outpaths_vector.items():
                 p = Path(p)
                 _ensure_parent(p)
                 fig.savefig(p, bbox_inches="tight")
 
         plt.show()
+
 
 # function to plot distribution of an AINI variable by years
 def plot_aini_hist_grid_by_years(
@@ -311,3 +310,396 @@ def plot_aini_hist_grid_by_years(
         fig.savefig(outpath, bbox_inches="tight", dpi=dpi)
 
     plt.show()
+
+# Function to plot timeline of extrema
+
+def plot_timeline(
+    custom_events: Optional[List[Dict]] = None,
+    outpath: Optional[str] = None,
+    figsize: Tuple[float, float] = (12, 3.8),
+    dpi: int = 300,
+    date_rotation: int = 60,   # stronger rotation for readability
+):
+    """
+    Plot AINI extrema timeline with a clean external legend (measures only).
+    - '^' for maxima above baseline; 'v' for minima below.
+    - Vertical offsets encode strength (n = 1/2/3).
+    - Legend (right side) shows ONLY the `measures` text.
+    - X-axis ticks are aggressively reduced (quarterly/half-year).
+    """
+
+    # 1) Events (use your set or pass custom_events)
+    if custom_events is None:
+        events = [
+            # Minima
+            {"date": pd.Timestamp("2025-02-06"), "kind": "min", "n": 3,
+             "measures": "normalized_AINI_custom, EMA_02_custom, EMA_08_custom"},
+            {"date": pd.Timestamp("2023-08-13"), "kind": "min", "n": 2,
+             "measures": "normalized_AINI_w0, EMA_08_w0"},
+            {"date": pd.Timestamp("2025-01-28"), "kind": "min", "n": 2,
+             "measures": "normalized_AINI_w1, EMA_08_w1"},
+            {"date": pd.Timestamp("2024-08-02"), "kind": "min", "n": 2,
+             "measures": "normalized_AINI_w2, EMA_08_w2"},
+            {"date": pd.Timestamp("2025-01-31"), "kind": "min", "n": 2,
+             "measures": "EMA_02_w1, EMA_02_w2 (mixed fast EMAs)"},
+            {"date": pd.Timestamp("2025-01-20"), "kind": "min", "n": 1,
+             "measures": "EMA_02_w0"},
+            # Maxima
+            {"date": pd.Timestamp("2025-06-07"), "kind": "max", "n": 3,
+             "measures": "normalized_AINI_w0, EMA_02_w0, EMA_08_w0"},
+            {"date": pd.Timestamp("2025-06-16"), "kind": "max", "n": 3,
+             "measures": "normalized_AINI_w2, EMA_02_w2, EMA_08_w2"},
+            {"date": pd.Timestamp("2025-06-10"), "kind": "max", "n": 2,
+             "measures": "normalized_AINI_w1, EMA_08_w1"},
+            # Maxima (n=1)
+            {"date": pd.Timestamp("2024-10-10"), "kind": "max", "n": 1,
+             "measures": "normalized_AINI_custom"},
+            {"date": pd.Timestamp("2023-04-09"), "kind": "max", "n": 1,
+             "measures": "EMA_02_custom"},
+            {"date": pd.Timestamp("2023-09-07"), "kind": "max", "n": 1,
+             "measures": "EMA_08_custom"},
+            {"date": pd.Timestamp("2025-03-22"), "kind": "max", "n": 1,
+             "measures": "EMA_02_w1"},
+        ]
+    else:
+        events = list(custom_events)
+
+    # 2) Prep
+    df = pd.DataFrame(events)
+    df["date"] = pd.to_datetime(df["date"], errors="raise")
+    df = df.sort_values("date").reset_index(drop=True)
+
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    ax.axhline(0, linewidth=1, color="black")
+
+    y_pos = {
+        ("max", 3): 0.6, ("max", 2): 0.4, ("max", 1): 0.25,
+        ("min", 3): -0.6, ("min", 2): -0.4, ("min", 1): -0.25,
+    }
+    marker = {"max": "^", "min": "v"}
+    color  = {"max": "#D55E00", "min": "#0072B2"}  # Okabe–Ito
+
+    # 3) Plot points and build legend entries (measures-only)
+    handles, labels = [], []
+    for _, r in df.iterrows():
+        y = y_pos[(r["kind"], int(r["n"]))]
+        h = ax.plot(
+            r["date"], y,
+            marker=marker[r["kind"]],
+            markersize=8,
+            linestyle="None",
+            color=color[r["kind"]],
+            label=str(r["measures"]),
+        )
+        handles.append(h[0])
+        labels.append(str(r["measures"]))
+
+    # 4) Aggressively reduce date ticks (quarterly / semi-annual)
+    span_days = (df["date"].max() - df["date"].min()).days
+    if span_days <= 365:
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))  # quarterly
+    else:
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=6))  # every 6 months
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    plt.setp(ax.get_xticklabels(), rotation=date_rotation, ha="right")
+
+    # 5) Cosmetics + legend outside
+    ax.set_ylim(-0.8, 0.8)
+    ax.set_yticks([])
+    ax.set_title("AINI Extrema Timeline")
+    ax.set_xlabel("Date")
+
+    # De-duplicate legend labels (same measures may appear multiple times)
+    uniq = []
+    uniq_handles = []
+    for h, lab in zip(handles, labels):
+        if lab not in uniq:
+            uniq.append(lab)
+            uniq_handles.append(h)
+
+    ax.legend(
+        uniq_handles, uniq,
+        loc="center left", bbox_to_anchor=(1.02, 0.5),
+        fontsize=8, frameon=False, borderaxespad=0.0,
+        handlelength=1.2, labelspacing=0.6,
+    )
+
+    # Leave space for legend
+    fig.tight_layout(rect=[0, 0, 0.70, 1])
+
+    if outpath:
+        fig.savefig(outpath, dpi=dpi, bbox_inches="tight")
+    return fig, ax
+
+# ------------------------------------------------------------
+# Color palette (Okabe–Ito; color-blind friendly)
+# ------------------------------------------------------------
+OI_BLUE = "#0072B2"
+OI_GREY = "#333333"
+
+
+# ------------------------------------------------------------
+# Measure tokens and event name helpers
+# ------------------------------------------------------------
+_MEASURE_TOKEN = {
+    "normalized_AINI": "norm",
+    "EMA_02": "02",
+    "EMA_08": "08",
+}
+
+def _abbr_window(win: str) -> str:
+    """
+    Convert window names to compact tokens:
+      - 'custom' -> 'c'
+      - 'w1+w2'  -> 'w1w2'
+      - 'w0'/'w1'/'w2' unchanged
+    """
+    win = str(win).strip()
+    if win.lower() == "custom":
+        return "c"
+    return win.replace("+", "")
+
+def _tokens_from_measures(measures: str) -> list[str]:
+    """
+    Parse a comma-separated 'measures' string and return compact tokens in order.
+    Example:
+        'normalized_AINI_custom, EMA_02_custom, EMA_08_custom'
+        -> ['norm', '02', '08']
+    """
+    toks: list[str] = []
+    for item in str(measures).split(","):
+        item = item.strip()
+        m = re.match(r"(normalized_AINI|EMA_02|EMA_08)", item)
+        if m:
+            toks.append(_MEASURE_TOKEN[m.group(1)])
+    return toks or ["unk"]
+
+def make_event_name(kind: str, window: str, measures: str) -> str:
+    """
+    Build indicative name like: 'min_c_norm_02_08', 'max_w2_norm_02_08', 'min_w1_08', ...
+    The numeric counter is *not* included; (n=...) communicates cardinality.
+    """
+    kind = str(kind).strip().lower()  # 'min' or 'max'
+    w = _abbr_window(window)
+    parts = _tokens_from_measures(measures)
+    comp = "_".join(parts)
+    return f"{kind}_{w}_{comp}"
+
+def rename_events(events: list[Dict]) -> list[Dict]:
+    """
+    Return a deep-copied list with 'name' replaced by the generated indicative name.
+    """
+    out: list[Dict] = []
+    for e in events:
+        e2 = dict(e)  # shallow copy is fine (only simple types used)
+        e2["name"] = make_event_name(e["kind"], e["window"], e["measures"])
+        out.append(e2)
+    return out
+
+
+# ------------------------------------------------------------
+# Default extrema events (edit here if you need to update)
+# ------------------------------------------------------------
+def default_extrema_events() -> list[Dict]:
+    """
+    Your curated extrema list. Names will be overwritten by `rename_events(...)`.
+    """
+    events = [
+        # ---- Minima ----
+        {"name": "", "date": pd.Timestamp("2025-02-06"), "kind": "min", "n": 3,
+         "window": "custom", "measures": "normalized_AINI_custom, EMA_02_custom, EMA_08_custom"},
+        {"name": "", "date": pd.Timestamp("2023-08-13"), "kind": "min", "n": 2,
+         "window": "w0", "measures": "normalized_AINI_w0, EMA_08_w0"},
+        {"name": "", "date": pd.Timestamp("2025-01-28"), "kind": "min", "n": 2,
+         "window": "w1", "measures": "normalized_AINI_w1, EMA_08_w1"},
+        {"name": "", "date": pd.Timestamp("2024-08-02"), "kind": "min", "n": 2,
+         "window": "w2", "measures": "normalized_AINI_w2, EMA_08_w2"},
+        {"name": "", "date": pd.Timestamp("2025-01-31"), "kind": "min", "n": 2,
+         "window": "w1+w2", "measures": "EMA_02_w1, EMA_02_w2 (mixed fast EMAs)"},
+        {"name": "", "date": pd.Timestamp("2025-01-20"), "kind": "min", "n": 1,
+         "window": "w0", "measures": "EMA_02_w0"},
+
+        # ---- Maxima ----
+        {"name": "", "date": pd.Timestamp("2025-06-07"), "kind": "max", "n": 3,
+         "window": "w0", "measures": "normalized_AINI_w0, EMA_02_w0, EMA_08_w0"},
+        {"name": "", "date": pd.Timestamp("2025-06-16"), "kind": "max", "n": 3,
+         "window": "w2", "measures": "normalized_AINI_w2, EMA_02_w2, EMA_08_w2"},
+        {"name": "", "date": pd.Timestamp("2025-06-10"), "kind": "max", "n": 2,
+         "window": "w1", "measures": "normalized_AINI_w1, EMA_08_w1"},
+
+        # ---- Maxima (custom singletons) ----
+        {"name": "", "date": pd.Timestamp("2024-10-10"), "kind": "max", "n": 1,
+         "window": "custom", "measures": "normalized_AINI_custom"},
+        {"name": "", "date": pd.Timestamp("2023-04-09"), "kind": "max", "n": 1,
+         "window": "custom", "measures": "EMA_02_custom"},
+        {"name": "", "date": pd.Timestamp("2023-09-07"), "kind": "max", "n": 1,
+         "window": "custom", "measures": "EMA_08_custom"},
+        {"name": "", "date": pd.Timestamp("2025-03-22"), "kind": "max", "n": 1,
+         "window": "w1", "measures": "EMA_02_w1"},
+    ]
+    return rename_events(events)
+
+
+# ------------------------------------------------------------
+# Plot: n_articles line + extrema markers (same semantics as your timeline)
+# ------------------------------------------------------------
+def plot_n_articles_with_extrema_events(
+    dfp: pd.DataFrame,
+    date_col: Optional[str] = "date",   # set None to use DatetimeIndex
+    count_col: str = "n_articles",
+    custom_events: Optional[list[Dict]] = None,
+    annotate: bool = True,
+    figsize: Tuple[float, float] = (12, 4.0),
+    dpi: int = 300,
+    outpath: Optional[str | Path] = None,
+):
+    """
+    Line plot of daily article counts with AINI extrema markers overlaid
+    (re-using the same marker logic as your `plot_timeline`).
+
+    Left y-axis  : counts (n_articles)
+    Right y-axis : a fixed band in [-0.8, 0.8] where extrema markers are placed.
+
+    - '^' for maxima and 'v' for minima.
+    - Vertical offsets encode strength (n = 1/2/3).
+    - If `custom_events` is None, uses `default_extrema_events()`.
+
+    Parameters
+    ----------
+    dfp : pd.DataFrame
+        Must contain the counts and some date field/index.
+    date_col : str | None
+        Name of the date column. If None, a DatetimeIndex is expected.
+    count_col : str
+        Name of the counts column (default: 'n_articles').
+    custom_events : list[dict] | None
+        Optional events; same schema as default_extrema_events().
+    annotate : bool
+        Whether to annotate marker labels.
+    figsize : (float, float)
+        Figure size in inches.
+    dpi : int
+        Resolution for display/saving.
+    outpath : str | Path | None
+        If provided, saves the figure.
+
+    Returns
+    -------
+    (fig, ax_counts)
+    """
+    dfp = dfp.copy()
+
+    # ---- Resolve date series ----
+    if date_col and date_col in dfp.columns:
+        date_ser = pd.to_datetime(dfp[date_col], errors="coerce")
+    elif isinstance(dfp.index, pd.DatetimeIndex):
+        date_ser = pd.to_datetime(dfp.index, errors="coerce")
+    else:
+        # fallback common names
+        date_ser = None
+        for cand in ("Date", "ds", "timestamp"):
+            if cand in dfp.columns:
+                date_ser = pd.to_datetime(dfp[cand], errors="coerce")
+                date_col = cand
+                break
+        if date_ser is None:
+            raise ValueError(
+                "No usable date column found. Provide `date_col` or set a DatetimeIndex.\n"
+                f"Available columns: {list(dfp.columns)}"
+            )
+
+    # ---- Validate counts ----
+    if count_col not in dfp.columns:
+        raise ValueError(
+            f"DataFrame must contain '{count_col}'. "
+            f"Available columns: {list(dfp.columns)}"
+        )
+
+    # ---- Clean & sort ----
+    dfp["_date"] = date_ser
+    dfp[count_col] = pd.to_numeric(dfp[count_col], errors="coerce")
+    dfp = dfp.dropna(subset=["_date", count_col]).sort_values("_date")
+    if dfp.empty:
+        raise ValueError("No valid rows after cleaning dates and counts.")
+
+    # ---- Events ----
+    events = custom_events if custom_events is not None else default_extrema_events()
+    ev_df = pd.DataFrame(events).copy()
+    ev_df["date"] = pd.to_datetime(ev_df["date"], errors="raise")
+    ev_df = ev_df.sort_values("date").reset_index(drop=True)
+
+    # Marker semantics (same as your timeline)
+    y_pos = {
+        ("max", 3): 0.6, ("max", 2): 0.4, ("max", 1): 0.25,
+        ("min", 3): -0.6, ("min", 2): -0.4, ("min", 1): -0.25,
+    }
+    marker = {"max": "^", "min": "v"}
+
+    # ---- Plot ----
+    fig, ax_counts = plt.subplots(figsize=figsize, dpi=dpi)
+
+    # Counts line
+    ax_counts.plot(
+        dfp["_date"], dfp[count_col],
+        color=OI_BLUE, linewidth=1.6, alpha=0.95, label=count_col
+    )
+    ax_counts.set_ylabel("Articles per day")
+    ax_counts.set_xlabel("Date")
+    ax_counts.grid(True, linestyle="--", alpha=0.4)
+
+    # Adaptive monthly ticks
+    span_days = (dfp["_date"].max() - dfp["_date"].min()).days
+    interval = 1 if span_days <= 120 else 2 if span_days <= 365 else 3
+    ax_counts.xaxis.set_major_locator(mdates.MonthLocator(interval=interval))
+    ax_counts.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    plt.setp(ax_counts.get_xticklabels(), rotation=0, ha="center")
+
+    # Secondary axis for markers
+    ax_evt = ax_counts.twinx()
+    ax_evt.set_ylim(-0.8, 0.8)
+    ax_evt.set_yticks([])
+    ax_evt.grid(False)
+
+    # Plot markers + annotations
+    for _, r in ev_df.iterrows():
+        ypos = y_pos[(str(r["kind"]).lower(), int(r["n"]))]
+        ax_evt.plot(
+            r["date"], ypos,
+            marker=marker[str(r["kind"]).lower()],
+            markersize=8,
+            linestyle="None",
+            color=OI_GREY,
+            zorder=3,
+        )
+        if annotate:
+            # Use the generated indicative name (already set by default_extrema_events())
+            label = f"{r['name']} (n={r['n']})"
+            ax_evt.annotate(
+                label,
+                xy=(r["date"], ypos),
+                xytext=(0, 10 if str(r["kind"]).lower() == "max" else -14),
+                textcoords="offset points",
+                ha="center",
+                va="bottom" if str(r["kind"]).lower() == "max" else "top",
+                fontsize=8,
+                color=OI_GREY,
+            )
+
+    fig.tight_layout()
+    if outpath:
+        outpath = Path(outpath)
+        outpath.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(outpath, dpi=dpi, bbox_inches="tight")
+
+    return fig, ax_counts
+
+
+# ------------------------------------------------------------
+# Public exports
+# ------------------------------------------------------------
+__all__ = [
+    "plot_n_articles_with_extrema_events",
+    "default_extrema_events",
+    "rename_events",
+    "make_event_name",
+]
