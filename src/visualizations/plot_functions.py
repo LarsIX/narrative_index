@@ -312,26 +312,38 @@ def plot_aini_hist_grid_by_years(
     plt.show()
 
 # Function to plot timeline of extrema
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from typing import Optional, List, Dict, Tuple
+from collections import OrderedDict
 
 def plot_timeline(
     custom_events: Optional[List[Dict]] = None,
     outpath: Optional[str] = None,
     figsize: Tuple[float, float] = (12, 3.8),
     dpi: int = 300,
-    date_rotation: int = 60,   # stronger rotation for readability
+    date_rotation: int = 60,
+    palette: Optional[List[str]] = None,
+    # NEW: fractions for non-zero / total articles, in the SAME ORDER as events below
+    fractions_min: Optional[List[str]] = None,
+    fractions_max: Optional[List[str]] = None,
 ):
     """
-    Plot AINI extrema timeline with a clean external legend (measures only).
-    - '^' for maxima above baseline; 'v' for minima below.
-    - Vertical offsets encode strength (n = 1/2/3).
-    - Legend (right side) shows ONLY the `measures` text.
-    - X-axis ticks are aggressively reduced (quarterly/half-year).
+    AINI extrema timeline with:
+      - distinct color per 'measures' (legend outside right),
+      - '^' for maxima above baseline; 'v' for minima below,
+      - vertical offset encodes strength (n = 1/2/3),
+      - per-point annotation showing 'nonzero/total' next to each marker.
+
+    Pass `fractions_min` and `fractions_max` as lists of strings like ["24/44", "2/7", ...]
+    aligned to the order of minima and maxima events respectively.
     """
 
-    # 1) Events (use your set or pass custom_events)
+    # 1) Events (order matters for fraction mapping!)
     if custom_events is None:
         events = [
-            # Minima
+            # Minima (6)
             {"date": pd.Timestamp("2025-02-06"), "kind": "min", "n": 3,
              "measures": "normalized_AINI_custom, EMA_02_custom, EMA_08_custom"},
             {"date": pd.Timestamp("2023-08-13"), "kind": "min", "n": 2,
@@ -344,14 +356,13 @@ def plot_timeline(
              "measures": "EMA_02_w1, EMA_02_w2 (mixed fast EMAs)"},
             {"date": pd.Timestamp("2025-01-20"), "kind": "min", "n": 1,
              "measures": "EMA_02_w0"},
-            # Maxima
+            # Maxima (7)
             {"date": pd.Timestamp("2025-06-07"), "kind": "max", "n": 3,
              "measures": "normalized_AINI_w0, EMA_02_w0, EMA_08_w0"},
             {"date": pd.Timestamp("2025-06-16"), "kind": "max", "n": 3,
              "measures": "normalized_AINI_w2, EMA_02_w2, EMA_08_w2"},
             {"date": pd.Timestamp("2025-06-10"), "kind": "max", "n": 2,
              "measures": "normalized_AINI_w1, EMA_08_w1"},
-            # Maxima (n=1)
             {"date": pd.Timestamp("2024-10-10"), "kind": "max", "n": 1,
              "measures": "normalized_AINI_custom"},
             {"date": pd.Timestamp("2023-04-09"), "kind": "max", "n": 1,
@@ -364,72 +375,127 @@ def plot_timeline(
     else:
         events = list(custom_events)
 
-    # 2) Prep
     df = pd.DataFrame(events)
     df["date"] = pd.to_datetime(df["date"], errors="raise")
     df = df.sort_values("date").reset_index(drop=True)
 
+    # Split indices for mapping fractions reliably
+    idx_min = [i for i, r in df.iterrows() if r["kind"] == "min"]
+    idx_max = [i for i, r in df.iterrows() if r["kind"] == "max"]
+
+    # If user passes fractions, validate lengths
+    if fractions_min is not None and len(fractions_min) != len(idx_min):
+        raise ValueError(f"fractions_min length {len(fractions_min)} != number of minima {len(idx_min)}")
+    if fractions_max is not None and len(fractions_max) != len(idx_max):
+        raise ValueError(f"fractions_max length {len(fractions_max)} != number of maxima {len(idx_max)}")
+
+    # 2) Figure
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
     ax.axhline(0, linewidth=1, color="black")
 
+    # Vertical positions by kind & n
     y_pos = {
         ("max", 3): 0.6, ("max", 2): 0.4, ("max", 1): 0.25,
         ("min", 3): -0.6, ("min", 2): -0.4, ("min", 1): -0.25,
     }
-    marker = {"max": "^", "min": "v"}
-    color  = {"max": "#D55E00", "min": "#0072B2"}  # Okabe–Ito
+    marker_shape = {"max": "^", "min": "v"}
 
-    # 3) Plot points and build legend entries (measures-only)
+    # Color-blind friendly palette (cycled per unique 'measures')
+    if palette is None:
+        palette = [
+            "#0072B2", "#D55E00", "#009E73", "#E69F00",
+            "#56B4E9", "#CC79A7", "#F0E442", "#000000",
+            "#7F3C8D", "#11A579", "#FF00E118", "#F2B701"
+        ]
+    measures_ordered = list(OrderedDict((str(m), None) for m in df["measures"]))
+    color_map = {m: palette[i % len(palette)] for i, m in enumerate(measures_ordered)}
+
+    # 3) Plot points, legend handles, and fraction annotations
     handles, labels = [], []
-    for _, r in df.iterrows():
-        y = y_pos[(r["kind"], int(r["n"]))]
+    min_counter, max_counter = 0, 0
+
+    for i, r in df.iterrows():
+        kind = r["kind"]
+        y = y_pos[(kind, int(r["n"]))]
+        m_text = str(r["measures"])
+        color = color_map[m_text]
+
         h = ax.plot(
             r["date"], y,
-            marker=marker[r["kind"]],
+            marker=marker_shape[kind],
             markersize=8,
             linestyle="None",
-            color=color[r["kind"]],
-            label=str(r["measures"]),
+            color=color,
+            label=m_text,
         )
         handles.append(h[0])
-        labels.append(str(r["measures"]))
+        labels.append(m_text)
 
-    # 4) Aggressively reduce date ticks (quarterly / semi-annual)
+        # ---- Fraction annotation per point ----
+        # choose fraction based on kind and position in that subset
+        if kind == "min":
+            frac = (fractions_min[min_counter] if fractions_min is not None else None)
+            min_counter += 1
+            dy = -6   # below
+            va = "top"
+        else:
+            frac = (fractions_max[max_counter] if fractions_max is not None else None)
+            max_counter += 1
+            dy = 6    # above
+            va = "bottom"
+
+        if frac:
+            # small, unobtrusive label near the marker
+            ax.annotate(
+                frac.replace(" ", ""),  # e.g., "24/44"
+                xy=(r["date"], y),
+                xytext=(4, dy),  # slight right + up/down
+                textcoords="offset points",
+                ha="left", va=va,
+                fontsize=8,
+                bbox=dict(facecolor="white", edgecolor="none", alpha=0.6, pad=1),
+                color=color,
+            )
+
+    # 4) Reduce date ticks + rotate
     span_days = (df["date"].max() - df["date"].min()).days
     if span_days <= 365:
-        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))  # quarterly
+        locator = mdates.MonthLocator(interval=3)   # quarterly
+    elif span_days <= 3 * 365:
+        locator = mdates.MonthLocator(interval=6)   # semiannual
     else:
-        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=6))  # every 6 months
+        locator = mdates.YearLocator(base=1)        # yearly
+    ax.xaxis.set_major_locator(locator)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
     plt.setp(ax.get_xticklabels(), rotation=date_rotation, ha="right")
 
-    # 5) Cosmetics + legend outside
+    # 5) Cosmetics + de-dup legend
     ax.set_ylim(-0.8, 0.8)
     ax.set_yticks([])
     ax.set_title("AINI Extrema Timeline")
     ax.set_xlabel("Date")
 
-    # De-duplicate legend labels (same measures may appear multiple times)
-    uniq = []
-    uniq_handles = []
+    seen = set()
+    uniq_handles, uniq_labels = [], []
     for h, lab in zip(handles, labels):
-        if lab not in uniq:
-            uniq.append(lab)
+        if lab not in seen:
+            seen.add(lab)
             uniq_handles.append(h)
+            uniq_labels.append(lab)
 
     ax.legend(
-        uniq_handles, uniq,
+        uniq_handles, uniq_labels,
         loc="center left", bbox_to_anchor=(1.02, 0.5),
         fontsize=8, frameon=False, borderaxespad=0.0,
         handlelength=1.2, labelspacing=0.6,
     )
 
-    # Leave space for legend
     fig.tight_layout(rect=[0, 0, 0.70, 1])
-
     if outpath:
         fig.savefig(outpath, dpi=dpi, bbox_inches="tight")
     return fig, ax
+
+# Function to plot timeline vs events 
 
 # ------------------------------------------------------------
 # Color palette (Okabe–Ito; color-blind friendly)
@@ -502,7 +568,7 @@ def rename_events(events: list[Dict]) -> list[Dict]:
 # ------------------------------------------------------------
 def default_extrema_events() -> list[Dict]:
     """
-    Your curated extrema list. Names will be overwritten by `rename_events(...)`.
+    curated extrema list. Names will be overwritten by `rename_events(...)`.
     """
     events = [
         # ---- Minima ----
@@ -515,7 +581,7 @@ def default_extrema_events() -> list[Dict]:
         {"name": "", "date": pd.Timestamp("2024-08-02"), "kind": "min", "n": 2,
          "window": "w2", "measures": "normalized_AINI_w2, EMA_08_w2"},
         {"name": "", "date": pd.Timestamp("2025-01-31"), "kind": "min", "n": 2,
-         "window": "w1+w2", "measures": "EMA_02_w1, EMA_02_w2 (mixed fast EMAs)"},
+         "window": "w1+w2", "measures": "EMA_02_w1, EMA_02_w2 (mixed)"},
         {"name": "", "date": pd.Timestamp("2025-01-20"), "kind": "min", "n": 1,
          "window": "w0", "measures": "EMA_02_w0"},
 
