@@ -3,39 +3,49 @@ CLI for estimating Granger causality (both directions) with Wild residual bootst
 
 - Supports a lag *range* for AINI lags, e.g. --p-x-range 1,3 runs p_x in {1,2,3}.
 - Defaults: n_boot=5000, fdr_alpha=0.1, min_obs=0, HAC covariance with auto NW lags.
-- AINI file inferred from version (w0,w1,w2,binary).
+- AINI file inferred from version (w0,w1,w2,w3,binary).
 - Controls: must pass --control-var (string), plus optional --controls-file/--controls-lags.
+- NEW: --ar-align-with-px to set p_ret = p_x per run, aligning AR lag count with the independent variable.
 
-The modelling function writes its own CSV:
-    granger_causality_{control_var}_{version}.csv
+The modelling functions DO NOT save inside this CLI; we save a single combined CSV:
+    granger_causality_{control_var}_{version}.csv  (when using controls)
+    granger_causality_{version}.csv               (without controls)
 
-Example usage:
-python run_estimate_granger_causality.py run-all-versions --versions "w1,w2" --control-var n_articles --controls-file data/processed/variables/n_articles.csv --controls-lags n_articles --p-x-range 1,3 --controls-align-with-px --n-boot 1 --min-obs 0 --outdir data/processed/variables
+Examples
+--------
+Run multiple versions with aligned control lags and aligned AR lags for p_x in {1,2,3}:
 
+python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var n_articles --controls-file data/processed/variables/n_articles.csv --controls-lags n_articles --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --p-ret 3 --n-boot 1 --min-obs 0 --outdir data/processed/variables
 
 """
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict
+
 import pandas as pd
 import typer
 
 this_file = Path(__file__).resolve()
 scripts_dir = this_file.parent
 src_dir = scripts_dir.parent
-root_dir = src_dir.parent # to load csv
+root_dir = src_dir.parent  # to load csv relative to repo root
 sys.path.append(str(src_dir))
 
-from modelling.estimate_granger_causality import run_gc_mbboot_fdr, run_gc_mbboot_fdr_controls  # noqa: E402
+from modelling.estimate_granger_causality import (  # noqa: E402
+    run_gc_mbboot_fdr,
+    run_gc_mbboot_fdr_controls,
+)
 
 app = typer.Typer(help="Run Granger Causality with wild residual bootstrap and BH-FDR.")
 
 # ----------------------
 # Helpers
 # ----------------------
+
 
 def parse_range(spec: Optional[str]) -> Optional[Tuple[int, int]]:
     if spec is None:
@@ -55,7 +65,8 @@ def parse_range(spec: Optional[str]) -> Optional[Tuple[int, int]]:
 def parse_controls_lags(spec: Optional[str]) -> Optional[Dict[str, int]]:
     """
     Parse controls lags like:
-      "n_articles"  -> {"n_articles": 1}
+      "n_articles"       -> {"n_articles": 1}
+      "n_articles:3,vix" -> {"n_articles": 3, "vix": 1}
     If --controls-align-with-px is set, the numeric parts are ignored downstream.
     """
     if spec is None:
@@ -64,7 +75,7 @@ def parse_controls_lags(spec: Optional[str]) -> Optional[Dict[str, int]]:
     if not s:
         return None
 
-    out = {}
+    out: Dict[str, int] = {}
     for part in s.split(","):
         part = part.strip()
         if not part:
@@ -78,10 +89,80 @@ def parse_controls_lags(spec: Optional[str]) -> Optional[Dict[str, int]]:
     return out
 
 
-
 def infer_aini_file_from_version(version: str) -> Path:
     base = src_dir.parent / "data" / "processed" / "variables"
     return base / f"{version}_AINI_variables.csv"
+
+# helper to find output path
+def _resolve_outdir(outdir: Optional[Path]) -> Path:
+    if outdir is None:
+        return (root_dir / "data" / "processed" / "variables").resolve()
+    outdir = Path(outdir)
+    if not outdir.is_absolute():
+        outdir = (root_dir / outdir).resolve()
+    return outdir
+
+def canonicalize_betas(df: pd.DataFrame, duplicate_beta0_ar: bool = False) -> pd.DataFrame:
+    """
+    Rename beta columns to a unified scheme for BOTH controls/no-controls paths:
+
+      Intercept:                    β₀
+      Cross (independent) lags:     β_x1, β_x2, ...
+      Autoregressive (dependent) lags: β_x1_ar, β_x2_ar, ...
+      Controls:                     β_ctrl_{name}{k}
+
+    Works for columns named with or without '_lag' in the source:
+      A2R_beta_x_lag2  or  A2R_beta_x_2
+      R2A_beta_ret_lag1 or R2A_beta_ret_1
+      A2R_beta_ctrl_n_articles_lag3 or A2R_beta_ctrl_n_articles_3
+    """
+    if df.empty:
+        return df
+    df = df.copy()
+    rename: Dict[str, str] = {}
+
+    # Intercepts (both directions)
+    for c in df.columns:
+        if c in ("A2R_beta_const", "R2A_beta_const"):
+            rename[c] = "β₀"
+
+    # Role maps (we don't need Direction per-row; names carry A2R/R2A)
+    role_maps = [
+        dict(cross="x", ar="ret", prefix="A2R"),   # AINI → Return
+        dict(cross="ret", ar="x", prefix="R2A"),   # Return → AINI
+    ]
+
+    cols = list(df.columns)
+    for rm in role_maps:
+        cross, ar, pref = rm["cross"], rm["ar"], rm["prefix"]
+        pat_cross = re.compile(rf"^{pref}_beta_{cross}(?:_lag)?(\d+)$")
+        pat_ar = re.compile(rf"^{pref}_beta_{ar}(?:_lag)?(\d+)$")
+        pat_ctrl = re.compile(rf"^{pref}_beta_ctrl_(.+?)(?:_lag)?(\d+)$")
+
+        for c in cols:
+            if not isinstance(c, str) or c in rename:
+                continue
+            m = pat_cross.match(c)
+            if m:
+                rename[c] = f"β_x{m.group(1)}"
+                continue
+            m = pat_ar.match(c)
+            if m:
+                rename[c] = f"β_x{m.group(1)}_ar"
+                continue
+            m = pat_ctrl.match(c)
+            if m:
+                ctrl_name_raw, lag = m.group(1), m.group(2)
+                safe = re.sub(r"[^A-Za-z0-9]+", "_", ctrl_name_raw).strip("_")
+                rename[c] = f"β_ctrl_{safe}{lag}"
+                continue
+
+    df = df.rename(columns=rename)
+
+    if duplicate_beta0_ar and "β₀" in df.columns:
+        df["β₀_ar"] = df["β₀"]
+
+    return df
 
 
 # ----------------------
@@ -94,7 +175,7 @@ def run(
     controls_file: Optional[Path] = None,
     controls_lags: Optional[str] = None,
     aini_file: Optional[Path] = None,
-    p_ret: int = 1,
+    p_ret: int = 3,
     p_x: int = 3,
     p_x_range: Optional[str] = "1,3",
     n_boot: int = 5000,
@@ -108,8 +189,15 @@ def run(
     seed: int = 42,
     n_jobs: int = -1,
     controls_align_with_px: bool = typer.Option(False, "--controls-align-with-px"),
+    ar_align_with_px: bool = typer.Option(
+        False,
+        "--ar-align-with-px",
+        help="If True, set p_ret = p_x for each run so AR lag count matches the independent variable.",
+    ),
 ):
     typer.echo(f"[INFO] Running version={version} with control_var={control_var}")
+    
+
 
     # --- Load data ---
     aini_path = infer_aini_file_from_version(version) if aini_file is None else aini_file
@@ -127,38 +215,65 @@ def run(
     typer.echo(f"[INFO] Lag values: {lag_values}")
 
     # --- Controls ---
-
     ctrl_df = pd.read_csv(root_dir / controls_file) if controls_file else None
     ctrl_lags_map = parse_controls_lags(controls_lags) if controls_lags else None
     use_controls = (ctrl_df is not None) and (ctrl_lags_map is not None)
 
-    frames = []
+    frames: List[pd.DataFrame] = []
     for px in lag_values:
         typer.echo(f"[RUN ] Estimating with p_x={px}")
 
-        ctrl_lags_eff = ({name: px for name in ctrl_lags_map.keys()}
-                         if (use_controls and controls_align_with_px)
-                         else ctrl_lags_map)
+        # Align AR lags with p_x if requested
+        pret_eff = (px if ar_align_with_px else p_ret)
+
+        ctrl_lags_eff = (
+            {name: px for name in ctrl_lags_map.keys()}
+            if (use_controls and controls_align_with_px)
+            else ctrl_lags_map
+        )
 
         if use_controls:
             df = run_gc_mbboot_fdr_controls(
-                aini_df=aini_df, fin_data=fin_data,
-                version=version, control_var=control_var,
-                controls_df=ctrl_df, controls_lags=ctrl_lags_eff,
-                aini_variants=variants_list, p_ret=p_ret, p_x=px,
-                min_obs=min_obs, n_boot=n_boot, seed=seed,
-                fdr_alpha=fdr_alpha, cov_for_analytic=cov_for_analytic,
-                hac_lags=hac_lags, weight_dist=weight_dist,
-                save_csv=False, outdir=outdir, outname=None, n_jobs=n_jobs,
+                aini_df=aini_df,
+                fin_data=fin_data,
+                version=version,
+                control_var=control_var,
+                controls_df=ctrl_df,
+                controls_lags=ctrl_lags_eff,
+                aini_variants=variants_list,
+                p_ret=pret_eff,
+                p_x=px,
+                min_obs=min_obs,
+                n_boot=n_boot,
+                seed=seed,
+                fdr_alpha=fdr_alpha,
+                cov_for_analytic=cov_for_analytic,
+                hac_lags=hac_lags,
+                weight_dist=weight_dist,
+                save_csv=False,
+                outdir=outdir,
+                outname=None,
+                n_jobs=n_jobs,
             )
         else:
             df = run_gc_mbboot_fdr(
-                aini_df=aini_df, fin_data=fin_data,
-                version=version, aini_variants=variants_list,
-                p_ret=p_ret, p_x=px, min_obs=min_obs, n_boot=n_boot,
-                seed=seed, fdr_alpha=fdr_alpha, cov_for_analytic=cov_for_analytic,
-                hac_lags=hac_lags, weight_dist=weight_dist,
-                save_csv=False, outdir=outdir, outname=None, n_jobs=n_jobs,
+                aini_df=aini_df,
+                fin_data=fin_data,
+                version=version,
+                aini_variants=variants_list,
+                p_ret=pret_eff,
+                p_x=px,
+                min_obs=min_obs,
+                n_boot=n_boot,
+                seed=seed,
+                fdr_alpha=fdr_alpha,
+                cov_for_analytic=cov_for_analytic,
+                hac_lags=hac_lags,
+                weight_dist=weight_dist,
+                save_csv=False,
+                outdir=outdir,
+                outname=None,
+                n_jobs=n_jobs,
             )
 
         df["p_x"] = px
@@ -167,19 +282,26 @@ def run(
     combined = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     typer.echo(f"[OK] Combined results shape: {combined.shape}")
 
-    # --- Save exactly one CSV ---
-    if outdir is None:
-        outdir = root_dir / "data" / "processed" / "variables"
-    outdir.mkdir(parents=True, exist_ok=True)
+    # Canonicalize beta column names BEFORE saving
+    combined = canonicalize_betas(combined, duplicate_beta0_ar=False)
 
-    outname = f"granger_causality_{control_var}_{version}.csv" if use_controls else f"granger_causality_{version}.csv"
-    outpath = root_dir / outdir / outname
-    combined.to_csv(outpath, index=False)
+    # Save exactly one CSV
+    outdir = _resolve_outdir(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    typer.echo(f"[OUTDIR] {outdir}")
+
+    outname = (
+        f"granger_causality_{control_var}_{version}.csv"
+        if use_controls
+        else f"granger_causality_{version}.csv"
+    )
+    outpath = outdir / outname
+    combined.to_csv(outpath, index=False, encoding="utf-8-sig")
     typer.echo(f"[SAVE] {outpath}")
 
 @app.command("run-all-versions")
 def run_all_versions(
-    versions: List[str] = typer.Option(["binary","w0","w1","w2"]),
+    versions: List[str] = typer.Option(["binary", "w0", "w1", "w2", "w3"]),
     control_var: str = typer.Option(..., help="Name of control variable."),
     controls_file: Optional[Path] = None,
     controls_lags: Optional[str] = None,
@@ -194,7 +316,13 @@ def run_all_versions(
     outdir: Optional[Path] = None,
     seed: int = 42,
     n_jobs: int = -1,
-    controls_align_with_px: bool = typer.Option(False, "--controls-align-with-px", help="Align controls to same lag as p_x."),
+    controls_align_with_px: bool = typer.Option(
+        False, "--controls-align-with-px", help="Align controls to same lag as p_x."
+    ),
+    ar_align_with_px: bool = typer.Option(
+        False, "--ar-align-with-px", help="Set p_ret = p_x to align AR lag count with the independent variable."
+    ),
+    p_ret: int = typer.Option(3, help="Baseline AR lag count when --ar-align-with-px is False."),
 ):
     """Run Granger causality estimation for multiple AINI versions in sequence."""
     for v in versions:
@@ -216,7 +344,10 @@ def run_all_versions(
             seed=seed,
             n_jobs=n_jobs,
             controls_align_with_px=controls_align_with_px,
+            ar_align_with_px=ar_align_with_px,
+            p_ret=p_ret,
         )
+
 
 if __name__ == "__main__":
     app()

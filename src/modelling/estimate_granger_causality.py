@@ -502,7 +502,8 @@ def run_gc_mbboot_fdr(   # keep name for backwards compatibility
 
     # ----- Save  -----
     if outname is None:
-        outname = f"granger_causality_{version}.csv"
+        suffix = f"pret{p_ret}_px{p_x}_"
+        outname = f"granger_causality_{version}_{suffix}.csv"
 
     if not out.empty and save_csv:
         if outdir is None:
@@ -757,7 +758,10 @@ def run_gc_mbboot_fdr_controls(
         out = pd.concat(corrected, ignore_index=True).sort_values(["Year", "Ticker", "AINI_variant", "Direction"])
 
     if outname is None:
-        outname = f"granger_causality_{control_var}_{version}.csv"
+        ctrl_tag = f"{control_var}_lags" + "".join(f"{k}{v}" for k,v in sorted((controls_lags or {}).items()))
+        suffix = f"pret{p_ret}_px{p_x}_"
+        outname = f"granger_causality_{version}_{ctrl_tag}_{suffix}.csv"
+
     if not out.empty and save_csv:
         if outdir is None:
             try:
