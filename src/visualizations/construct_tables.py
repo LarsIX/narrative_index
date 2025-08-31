@@ -17,12 +17,10 @@ Stars:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Dict, List, Tuple
 import re
 import numpy as np
 import pandas as pd
-
-
 # ----------------------------- configuration -------------------------------- #
 # Columns to drop (exactly as requested; NOTE: p_x is kept via rename->n_lags)
 _DROP_COLS = [
@@ -278,3 +276,218 @@ def export_regression_table(
     # 9) Write .tex
     out_path.write_text(preamble + latex_core + postamble, encoding="utf-8")
     return out_path
+
+
+# rmd tables for presentation
+
+import re
+from pathlib import Path
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from pptx.enum.text import PP_ALIGN
+from pptx.dml.color import RGBColor
+
+# --- helpers ---
+def parse_markdown_table(md: str):
+    """
+    Parse a GitHub-style pipe table into (headers, rows).
+    md: one table string starting with a header row, then a separator row, then data rows.
+    """
+    lines = [ln.strip() for ln in md.strip().splitlines() if ln.strip()]
+    # filter out markdown headings accidentally included
+    lines = [ln for ln in lines if ln.startswith("|") and ln.endswith("|")]
+
+    if len(lines) < 2:
+        raise ValueError("Markdown table must have at least a header and a separator row.")
+
+    def split_row(ln):
+        # drop leading and trailing pipe, then split
+        parts = [c.strip() for c in ln.strip("|").split("|")]
+        return parts
+
+    header = split_row(lines[0])
+    # skip the separator line (second)
+    body_lines = lines[2:] if len(lines) >= 2 else []
+    rows = [split_row(ln) for ln in body_lines]
+    return header, rows
+
+def add_markdown_text_to_cell(cell, text: str, base_size=12):
+    """
+    Write text to a PPTX table cell and make **bold** segments bold.
+    """
+    # clear default paragraph
+    cell.text = ""
+    p = cell.text_frame.paragraphs[0]
+    p.alignment = PP_ALIGN.LEFT
+
+    # split on **...**
+    tokens = re.split(r"(\*\*.*?\*\*)", text)
+    for tok in tokens:
+        run = p.add_run()
+        if tok.startswith("**") and tok.endswith("**") and len(tok) >= 4:
+            run.text = tok[2:-2]
+            run.font.bold = True
+        else:
+            run.text = tok
+        run.font.size = Pt(base_size)
+
+def add_table_slide(prs: Presentation, title: str, headers, rows, font_size=12):
+    # layout: title + content
+    slide = prs.slides.add_slide(prs.slide_layouts[5])  # Title Only (5) or Blank (6)
+    # Title
+    txbox = slide.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.6))
+    p = txbox.text_frame.paragraphs[0]
+    p.text = title
+    p.font.size = Pt(20)
+    p.font.bold = True
+
+    n_rows = max(1, len(rows)) + 1
+    n_cols = len(headers)
+
+    # Table size/position
+    left, top, width, height = Inches(0.5), Inches(1.0), Inches(9.0), Inches(0.4 + 0.3*n_rows)
+    tbl = slide.shapes.add_table(n_rows, n_cols, left, top, width, height).table
+
+    # Header row
+    for j, h in enumerate(headers):
+        add_markdown_text_to_cell(tbl.cell(0, j), h, base_size=font_size)
+        # Header styling
+        for run in tbl.cell(0, j).text_frame.paragraphs[0].runs:
+            run.font.bold = True
+
+    # Body rows
+    for i, row in enumerate(rows, start=1):
+        for j, val in enumerate(row):
+            add_markdown_text_to_cell(tbl.cell(i, j), val, base_size=font_size)
+
+    # Optional: column width tweaks (uniform)
+    for j in range(n_cols):
+        tbl.columns[j].width = Inches(9.0 / n_cols)
+
+    return slide
+
+# --- main export function ---
+def markdown_tables_to_pptx(markdown_dict, outpath="a2r_tables_auto.pptx"):
+    """
+    markdown_dict: {model: [md_table_chunk_1, md_table_chunk_2, ...]}
+    Creates one slide per chunk. Slide title: 'Model = {model} (Chunk k)'.
+    """
+    prs = Presentation()
+    for model, chunks in markdown_dict.items():
+        for k, md in enumerate(chunks, 1):
+            headers, rows = parse_markdown_table(md)
+            title = f"Model = {model} (Chunk {k})" if len(chunks) > 1 else f"Model = {model}"
+            add_table_slide(prs, title, headers, rows, font_size=12)
+    prs.save(outpath)
+    return Path(outpath).resolve()
+
+def make_mrkdwn_tables(
+    df: pd.DataFrame,
+    drop_cols=("BH_corr_F_pval","BH_corr_F_pval_HC3","Direction","A2R_beta_const"),
+    priority=(("w0","2023"),("w2","2025"),("w2","2023_24_25")),
+    chunk_size=20
+):
+    """
+    Create Markdown table chunks from the input dataframe.
+
+    Returns: dict {model: [markdown_table_chunk1, markdown_table_chunk2, ...]}
+    """
+
+    # 1. Reorder rows (priority first)
+    mask = df[["Model","Year"]].apply(tuple, axis=1).isin(priority)
+    df = pd.concat([df[mask], df[~mask]], ignore_index=True)
+
+    # 2. Drop unwanted cols
+    df = df.drop(columns=[c for c in drop_cols if c in df.columns], errors="ignore")
+
+    # 3. Rename to Greek symbols
+    rename_map = {
+        "A2R_beta_ret_lag1": "β_ret",
+        "A2R_beta_x_lag1": "γ₁",
+        "A2R_beta_x_lag2": "γ₂",
+        "A2R_beta_x_lag3": "γ₃",
+    }
+    df = df.rename(columns={k:v for k,v in rename_map.items() if k in df.columns})
+
+    # 4. Bold positives
+    def bold_pos(x: float) -> str:
+        try:
+            return f"**{x:.6f}**" if float(x) > 0 else f"{x:.6f}"
+        except Exception:
+            return str(x)
+
+    for col in ["β_ret","γ₁","γ₂","γ₃"]:
+        if col in df.columns:
+            df[col] = df[col].apply(bold_pos)
+
+    # 5. Split into Markdown by Model
+    out = {}
+    for model, sub in df.groupby("Model", sort=False):
+        chunks = []
+        for i in range(0, len(sub), chunk_size):
+            chunk = sub.iloc[i:i+chunk_size]
+            chunks.append(chunk.to_markdown(index=False))
+        out[model] = chunks
+
+    return out
+import pandas as pd
+
+def make_mrkdwn_tables_focus(
+    df: pd.DataFrame,
+    focus_rows=(("w0", "2023"), ("w2", "2025"), ("w2", "2023_24_25")),
+    drop_cols=("BH_corr_F_pval","BH_corr_F_pval_HC3","Direction","A2R_beta_const"),
+    chunk_size=11
+):
+    """
+    Create Markdown tables only for the specified (Model, Year) pairs.
+    Returns: dict {model: [markdown_table_chunk1, ...]}  (never None).
+    """
+
+    # --- sanity: show what pairs exist in the data
+    available = set(df[["Model","Year"]].astype(str).apply(tuple, axis=1).unique())
+    focus = set((str(m), str(y)) for m, y in focus_rows)
+    missing = focus - available
+    if missing:
+        print("WARN: These (Model, Year) pairs not found in df:", sorted(missing))
+        print("INFO: Available pairs sample:", sorted(list(available))[:10])
+
+    # 1) Filter only the focus rows
+    mask = df[["Model","Year"]].astype(str).apply(tuple, axis=1).isin(focus)
+    sub = df.loc[mask].copy()
+    if sub.empty:
+        print("WARN: After filtering, no rows remain. Returning empty dict.")
+        return {}
+
+    # 2) Drop columns
+    sub.drop(columns=[c for c in drop_cols if c in sub.columns], errors="ignore", inplace=True)
+
+    # 3) Rename to Greek
+    rename_map = {
+        "A2R_beta_ret_lag1": "β_ret",
+        "A2R_beta_x_lag1": "γ₁",
+        "A2R_beta_x_lag2": "γ₂",
+        "A2R_beta_x_lag3": "γ₃",
+    }
+    sub.rename(columns={k:v for k,v in rename_map.items() if k in sub.columns}, inplace=True)
+
+    # 4) Bold positives
+    def bold_pos(x):
+        try:
+            x = float(x)
+            return f"**{x:.6f}**" if x > 0 else f"{x:.6f}"
+        except Exception:
+            return str(x)
+
+    for col in ("β_ret","γ₁","γ₂","γ₃"):
+        if col in sub.columns:
+            sub[col] = sub[col].apply(bold_pos)
+
+    # 5) Split by Model and chunk (≤11 rows)
+    out = {}
+    for model, g in sub.groupby("Model", sort=False):
+        if {"Ticker","Year"}.issubset(g.columns):
+            g = g.sort_values(["Ticker","Year"], kind="stable")
+        chunks = [g.iloc[i:i+chunk_size].to_markdown(index=False) for i in range(0, len(g), chunk_size)]
+        out[model] = chunks
+
+    return out

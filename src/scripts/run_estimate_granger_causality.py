@@ -14,8 +14,11 @@ The modelling functions DO NOT save inside this CLI; we save a single combined C
 Examples
 --------
 Run multiple versions with aligned control lags and aligned AR lags for p_x in {1,2,3}:
-
+control n_articles:
 python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var n_articles --controls-file data/processed/variables/n_articles.csv --controls-lags n_articles --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --p-ret 3 --n-boot 1 --min-obs 0 --outdir data/processed/variables
+
+control VIX:
+python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var log_growth_VIX --controls-file data/processed/variables/log_growth_VIX.csv --controls-lags log_growth_VIX --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --p-ret 3 --n-boot 10000 --min-obs 0 --outdir data/processed/variables
 
 """
 
