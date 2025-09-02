@@ -4,9 +4,7 @@ This repository contains the full research pipeline for constructing the **AI Na
 
 The project integrates **Transformer-based NLP**, **manual annotation**, **deep learning fine-tuning**, and **econometric inference** — all within a modular and reproducible architecture.
 
-![Structure](https://github.com/user-attachments/assets/c8150086-edc4-4742-a637-48e0e4caf2c9)
-
-
+![Flowchart](https://github.com/user-attachments/assets/1296faff-9172-4a18-af42-16b829f4c823)
 
 ---
 
