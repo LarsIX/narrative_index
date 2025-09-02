@@ -4,6 +4,10 @@ This repository contains the full research pipeline for constructing the **AI Na
 
 The project integrates **Transformer-based NLP**, **manual annotation**, **deep learning fine-tuning**, and **econometric inference** — all within a modular and reproducible architecture.
 
+![Structure](https://github.com/user-attachments/assets/c8150086-edc4-4742-a637-48e0e4caf2c9)
+
+
+
 ---
 
 ## Research Objectives
@@ -16,9 +20,10 @@ The project integrates **Transformer-based NLP**, **manual annotation**, **deep 
 
 ---
 
+
 ## Construction of the AINI Index
 
-To quantify the AI Narrative Index (AINI), this project implements **three complementary methods** — combining human annotation, Transformer models, and prompt-based weak supervision.
+To quantify the AI Narrative Index (AINI), this project implements **complementary methods** — combining human annotation, transformer models, and dictionary-based methods.
 
 ### 1. AINI via Manual Annotation and FinBERT Fine-Tuning
 
@@ -30,19 +35,19 @@ To quantify the AI Narrative Index (AINI), this project implements **three compl
   - Window-based context extraction  
   - Early stopping and evaluation logging
 
-- The resulting predictions form a **binary AI Narrative Index**, capturing the **topic salience** of AI-related narratives — i.e., how prominently AI is discussed in financial news coverage.
+- The resulting predictions indicate the presence or absence of AI-related narratives.
+  
+- The pretrained **FinBERT model** ([ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is applied to articles related to AI-related articles to infer sentiment.
+- - The resulting **sentiment outputs** are aggregated into a daily AINI time series.
 
 ---
 
-### 2. AINI via Standard FinBERT and Snippet Reduction
+### 2. AINI via Standard FinBERT and Snippet Reduction via dictionaries
+- AI-narrative-presence in **pre-cleaned WSJ articles** is inferred via dictionarie-based methods (i.e., the presence of key-words).
 
-- The pretrained **FinBERT model** ([ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is applied to **pre-cleaned WSJ articles** without additional training.
+- The pretrained **FinBERT model** ([ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is again applied to articles related to AI-related articles to infer sentiment.
 
-- Articles are first **reduced using preprocessing and dimensionality reduction techniques**, including:
-  - Heuristic snippet extraction around AI keywords  
-  - BERT-based contextual windowing
-
-- The resulting **probabilistic sentiment outputs** are aggregated into a daily AINI time series.
+- The resulting **sentiment outputs** are aggregated into a daily AINI time series.
 
 ---
 
@@ -62,15 +67,8 @@ Used to validate input variables before time series modeling.
 
 Tests predictive causality between AINI and log returns or volatility indices using:
 
-- **bootstrapping**: to create empirical p-values
+- **bootstrapping** with 10 000 shuffles & Rademacher weights to create empirical p-values
 - **Benjamini-Hochberg correction** to reduce the false-discovery-rate
-
-Supports both directions: `AINI ➝ returns` and `returns ➝ AINI`.
-
-## Transfer Entropy (TE)
-
-- KSG estimator for nonlinear, asymmetric dependencies
-- IDTxl framework with permutation-based significance testing
 
 ## Project Structure
 
