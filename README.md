@@ -10,7 +10,7 @@ The project integrates **Transformer-based NLP**, **manual annotation**, **deep 
 
 - **Develop multiple variants of an AI Narrative Index (AINI)** via transformer-based methods.
 
-- **Evaluate the temporal effects** of narrative hype on market dynamics using Granger Causality and Transfer Entropy.
+- **Evaluate the temporal effects** of narrative hype on market dynamics using Granger Causality.
 
 - **Ensure scientific rigor** through pre-annotation protocols, dual-labeller verification, and formal statistical diagnostics.
 
