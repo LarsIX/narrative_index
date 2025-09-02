@@ -46,18 +46,6 @@ To quantify the AI Narrative Index (AINI), this project implements **three compl
 
 ---
 
-### 3. AINI via ChatGPT Labeling and Prompt Engineering
-
-- WSJ articles are labeled for **AI relevance** using **GPT-4 via the OpenAI API**, with few-shot prompting and *Chain-of-Thought* reasoning.
-
-- Only articles classified as **AI-related** are passed to the **pretrained FinBERT model** to predict their **sentiment**.
-
-- As in Method 2, sentiment scores are aggregated into a daily AINI time series — but here restricted to **GPT-identified AI narratives**.
-
-- Ongoing evaluation focuses on:
-  - Agreement between GPT labels and human annotations  
-  - Stability across prompt designs and reasoning chains  
-
 ## Statistical Testing & Causal Inference
 
 The project applies **rigorous time series diagnostics and hypothesis testing** to analyze the link between narrative indices and financial markets:
@@ -66,6 +54,7 @@ The project applies **rigorous time series diagnostics and hypothesis testing** 
 
 - Augmented Dickey-Fuller (ADF)
 - Phillips-Perron (PP)
+- Kwiatkowski-Phillips-Schmidt-Shin (KPSS) 
 
 Used to validate input variables before time series modeling.
 
@@ -117,7 +106,6 @@ AI_narrative_index/
 │   │   ├── stationarity_testing.py             # Perform ADF and PP stationarity tests
 │   │   ├── estimate_transfer_entropy.py        # Estimate Transfer Entropy between AINI and financial variables
 │   │   ├── estimate_granger_causality.py       # Estimate Granger causality with heteroskedasticity-aware bootstrapping
-│   │   ├── estimate_OLS.py                     # Estimate OLS for same-day returns with heteroskedasticity-aware bootstrapping
 │   │   ├── predict_binary_AINI_FinBERT.py      # Classify articles (AI-related vs. not) using custom FinBERT
 │   │   └── predict_AINI_FinBERT_window.py      # Classify with windowed context using FinBERT
 │   │
@@ -275,7 +263,6 @@ This repository forms the empirical foundation of a master's thesis in Economics
 
 - **Behavioral finance and narrative theory**
 - **NLP and deep learning with Transformers**
-- **Causal inference using both econometrics and information theory**
 
 ---
 
