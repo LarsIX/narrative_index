@@ -8,7 +8,7 @@ The project integrates **Transformer-based NLP**, **manual annotation**, **deep 
 
 ## Research Objectives
 
-- **Develop multiple variants of an AI Narrative Index (AINI)** using both **supervised fine-tuning** and **zero-shot inference**.
+- **Develop multiple variants of an AI Narrative Index (AINI)** via transformer-based methods.
 
 - **Evaluate the temporal effects** of narrative hype on market dynamics using Granger Causality and Transfer Entropy.
 
