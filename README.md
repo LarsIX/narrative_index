@@ -48,6 +48,7 @@ Die Messung erfolgt durch die Kombination von **menschlicher Annotation, Transfo
 - Anwendung von **FinBERT** auf extrahierte **Textausschnitte** rund um verschiedene **Kontextfenster**.  
 - Die resultierenden Sentimentausgaben werden ebenfalls **normalisiert, aggregiert und geglättet** und in **tägliche AINI-Zeitreihen** überführt.  
 
+
 ---
 
 ## Statistische Inferenz
@@ -79,11 +80,21 @@ Regressionsspezifikation (mit VIX-Wachstumsrate als Kontrollvariable für Marktr
 
 ## Ergebnisse (Auswahl)
 
-- Für stark KI-exponierte Unternehmen (z. B. NVIDIA, Broadcom) zeigen sich **robuste Zusammenhänge** AINI → Renditen.  
-- Die Signifikanz ist sowohl nach **analytischen Verfahren (HC3)** als auch nach **Bootstrap-Inferenz mit FDR-Korrektur** nachweisbar.  
+Das erste Diagramm veranschaulicht den AI Narrative Index (AINI) in unterschiedlichen Varianten, wobei **Präfixe die Größe** des verwendeten **Kontextfensters** anzeigen.
+Die **Variante C** basiert auf dem **vollständigen Artikel** (Titel + Haupttext) und nutzt den maximal möglichen Input von 512 Tokens.
+Die dargestellten **Datenreihen** entsprechen dem **Mittelwert aller verwendeten Variablen** (siehe Formel) innerhalb des jeweiligen Kontextfensters.
+
+![AINI](aini_means.png)
+
+Das folgende Diagramm zeigt die geschätzten Regressionskoeffizienten der unterschiedlichen AINI-Variablen für die jeweiligen Aktien & ETFs.
+Die Signifikanz wird durch beide Verfahren unabhängig voneinander bestätigt – sowohl mittels analytischer Tests als auch durch Bootstrap-Inferenz mit FDR-Korrektur.
 
 ![Scatter of coefficients](image.png)  
 
+Vorläufige Konklusion:
+- Die Größe des Kontextfensters korreliert mit der Negativität des AINI.
+- Für w=0, 1 & 2 erreichen die Indizes ihre Peaks zu teilweise erwartbaren Zeitpunkten.
+- Für stark KI-exponierte Unternehmen (z. B. NVIDIA, Broadcom) zeigen sich **robuste Zusammenhänge** AINI → Renditen.  
 ---
 
 # Projektstruktur
