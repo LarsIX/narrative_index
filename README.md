@@ -1,8 +1,10 @@
 # AI Narrative Index (AINI)
 
-This repository contains the full research pipeline for constructing the **AI Narrative Index (AINI)** — a time-series measure of how artificial intelligence is represented and emotionally framed in financial news. The index is derived from **Wall Street Journal (WSJ)** articles from **2023 to 2025** and used as an independent variable to estimate asset returns.
+This repository contains the full research pipeline for constructing the **AI Narrative Index (AINI)** — a time-series measure of how artificial intelligence is represented and emotionally framed in financial news.  
 
-The project integrates **Transformer-based NLP**, **manual annotation**, **deep learning fine-tuning**, and **econometric inference** — all within a modular and reproducible architecture. Below is a brief overview of the project structure.
+The index is derived from **Wall Street Journal (WSJ)** articles (2023–2025) and evaluated as a predictive factor for asset returns and volatility.
+
+The project integrates **Transformer-based NLP**, **manual annotation**, **deep learning fine-tuning**, and **statistical inference** — all within a modular and reproducible architecture.
 
 ![Flowchart](https://github.com/user-attachments/assets/1296faff-9172-4a18-af42-16b829f4c823)
 
@@ -10,64 +12,76 @@ The project integrates **Transformer-based NLP**, **manual annotation**, **deep 
 
 ## Research Objectives
 
-- **Develop multiple variants of an AI Narrative Index (AINI)** via transformer-based methods.
-
-- **Evaluate the temporal effects** of narrative hype on market dynamics using Granger Causality.
-
-- **Ensure scientific rigor** through pre-annotation protocols, dual-labeller verification, and formal statistical diagnostics.
+- **Develop AI Narrative Indices (AINI)** with multiple methodological variants  
+- **Quantify narrative hype effects** on market dynamics using Granger causality  
+- **Ensure statistical rigor** through robust annotation protocols, diagnostics, and resampling-based inference  
 
 ---
 
+## Construction of the AINI
 
-## Construction of the AINI Index
+To quantify the AI Narrative Index, this project combines **human annotation, transformer models, and dictionary-based methods**.
 
-To quantify the AI Narrative Index (AINI), this project implements **complementary methods** — combining human annotation, transformer models, and dictionary-based methods.
+### 1. Human Annotation & FinBERT Fine-Tuning
 
-### 1. AINI via Manual Annotation and FinBERT Fine-Tuning
-
-- A manually annotated dataset was created in collaboration with a **professional second annotator**, focusing on:
+- A manually annotated dataset was created with **dual-label verification**.  
+- Labels focused on:  
   - **AI Relevance** (binary classification)  
 
-- A custom **FinBERT model** is fine-tuned on this dataset, using:
+- A custom **FinBERT** model was fine-tuned with:  
   - Class-weighted loss  
-  - Window-based context extraction  
-  - Early stopping and evaluation logging
+  - Context-window extraction  
+  - Early stopping and evaluation logging  
 
-- The resulting predictions indicate the presence or absence of AI-related narratives.
-  
-- The pretrained **FinBERT model** ([ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is applied to articles related to AI-related articles to infer sentiment.
-- - The resulting **sentiment outputs** are aggregated into a daily AINI time series.
+- The fine-tuned model detects AI-related narratives in WSJ articles.  
+- Sentiment analysis (using [ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is applied to these narratives.  
+- The resulting sentiment outputs are **further processed (normalization, aggregation, exponential smoothing)** into a **daily AINI time series**.  
 
 ---
 
-### 2. AINI via Standard FinBERT and Snippet Reduction via dictionaries
-- AI-narrative-presence in **pre-cleaned WSJ articles** is inferred via dictionarie-based methods (i.e., the presence of key-words).
+### 2. Dictionary-Supported Snippet Reduction
 
-- The pretrained **FinBERT model** ([ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is again applied to articles related to AI-related articles to infer sentiment.
-
-- The resulting **sentiment outputs** are aggregated into a daily AINI time series.
+- AI relevance in **pre-cleaned WSJ articles** is inferred with keyword dictionaries.  
+- ProsusAI/finbert is applied to extracted snippets.  
+- The resulting sentiment outputs are again **further processed (normalization, aggregation, exponential smoothing)** into a **daily AINI time series**.    
 
 ---
 
 ## Statistical Testing & Causal Inference
 
-The project applies **rigorous time series diagnostics and hypothesis testing** to analyze the link between narrative indices and financial markets:
+This project applies **robust time series econometrics** to test whether AI narratives Granger-cause asset returns or volatility indices.
 
 ### Stationarity Testing
+- Augmented Dickey-Fuller (ADF)  
+- Phillips-Perron (PP)  
+- KPSS  
 
-- Augmented Dickey-Fuller (ADF)
-- Phillips-Perron (PP)
-- Kwiatkowski-Phillips-Schmidt-Shin (KPSS) 
-
-Used to validate input variables before time series modeling.
+All input variables are validated for stationarity before modeling.
 
 ### Granger Causality (GC)
 
-Tests predictive causality between AINI and log returns or volatility indices using:
+Predictive causality between AINI and financial variables is tested with:
 
-- **bootstrapping** with 10 000 shuffles & Rademacher weights to create empirical p-values
-- **Benjamini-Hochberg correction** to reduce the false-discovery-rate
+- **Wild residual bootstrap** (10,000 shuffles, Rademacher weights) → robust empirical p-values  
+- **Benjamini–Hochberg correction** → controls false discovery rate in multiple testing  
 
+Regression specification (with VIX log growth as a market risk control):
+
+![Granger regression](VIX_GC_formula.png)  
+![Legend](legend_GC.png)  
+
+---
+
+## Selected Results
+
+- Stocks with strong AI exposure (e.g. NVIDIA, Broadcom) show **robust predictive links** from AINI → returns.  
+- Significance confirmed by **both analytic (HC3/HAC) and bootstrap p-values** after FDR correction.  
+
+![Scatter of coefficients](image.png)  
+
+*Significance on both methods = robust evidence of predictive causality.*  
+
+---
 ## Project Structure
 
 ```text
