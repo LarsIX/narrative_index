@@ -2,23 +2,26 @@
 
 This repository contains the full research pipeline for constructing the **AI Narrative Index (AINI)** — a time-series measure of how artificial intelligence is represented and emotionally framed in financial news. The index is derived from **Wall Street Journal (WSJ)** articles from **2023 to 2025** and used as an independent variable to estimate asset returns.
 
-The project integrates **Transformer-based NLP**, **manual annotation**, **deep learning fine-tuning**, and **econometric and information-theoretic inference** — all within a modular and reproducible architecture.
+The project integrates **Transformer-based NLP**, **manual annotation**, **deep learning fine-tuning**, and **econometric inference** — all within a modular and reproducible architecture. Below is a brief overview of the project structure.
+
+![Flowchart](https://github.com/user-attachments/assets/1296faff-9172-4a18-af42-16b829f4c823)
 
 ---
 
 ## Research Objectives
 
-- **Develop multiple variants of an AI Narrative Index (AINI)** using both **supervised fine-tuning** and **zero-shot inference**.
+- **Develop multiple variants of an AI Narrative Index (AINI)** via transformer-based methods.
 
-- **Evaluate the temporal effects** of narrative hype on market dynamics using Granger Causality and Transfer Entropy.
+- **Evaluate the temporal effects** of narrative hype on market dynamics using Granger Causality.
 
 - **Ensure scientific rigor** through pre-annotation protocols, dual-labeller verification, and formal statistical diagnostics.
 
 ---
 
+
 ## Construction of the AINI Index
 
-To quantify the AI Narrative Index (AINI), this project implements **three complementary methods** — combining human annotation, Transformer models, and prompt-based weak supervision.
+To quantify the AI Narrative Index (AINI), this project implements **complementary methods** — combining human annotation, transformer models, and dictionary-based methods.
 
 ### 1. AINI via Manual Annotation and FinBERT Fine-Tuning
 
@@ -30,33 +33,21 @@ To quantify the AI Narrative Index (AINI), this project implements **three compl
   - Window-based context extraction  
   - Early stopping and evaluation logging
 
-- The resulting predictions form a **binary AI Narrative Index**, capturing the **topic salience** of AI-related narratives — i.e., how prominently AI is discussed in financial news coverage.
+- The resulting predictions indicate the presence or absence of AI-related narratives.
+  
+- The pretrained **FinBERT model** ([ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is applied to articles related to AI-related articles to infer sentiment.
+- - The resulting **sentiment outputs** are aggregated into a daily AINI time series.
 
 ---
 
-### 2. AINI via Standard FinBERT and Snippet Reduction
+### 2. AINI via Standard FinBERT and Snippet Reduction via dictionaries
+- AI-narrative-presence in **pre-cleaned WSJ articles** is inferred via dictionarie-based methods (i.e., the presence of key-words).
 
-- The pretrained **FinBERT model** ([ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is applied to **pre-cleaned WSJ articles** without additional training.
+- The pretrained **FinBERT model** ([ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is again applied to articles related to AI-related articles to infer sentiment.
 
-- Articles are first **reduced using preprocessing and dimensionality reduction techniques**, including:
-  - Heuristic snippet extraction around AI keywords  
-  - BERT-based contextual windowing
-
-- The resulting **probabilistic sentiment outputs** are aggregated into a daily AINI time series.
+- The resulting **sentiment outputs** are aggregated into a daily AINI time series.
 
 ---
-
-### 3. AINI via ChatGPT Labeling and Prompt Engineering
-
-- WSJ articles are labeled for **AI relevance** using **GPT-4 via the OpenAI API**, with few-shot prompting and *Chain-of-Thought* reasoning.
-
-- Only articles classified as **AI-related** are passed to the **pretrained FinBERT model** to predict their **sentiment**.
-
-- As in Method 2, sentiment scores are aggregated into a daily AINI time series — but here restricted to **GPT-identified AI narratives**.
-
-- Ongoing evaluation focuses on:
-  - Agreement between GPT labels and human annotations  
-  - Stability across prompt designs and reasoning chains  
 
 ## Statistical Testing & Causal Inference
 
@@ -66,6 +57,7 @@ The project applies **rigorous time series diagnostics and hypothesis testing** 
 
 - Augmented Dickey-Fuller (ADF)
 - Phillips-Perron (PP)
+- Kwiatkowski-Phillips-Schmidt-Shin (KPSS) 
 
 Used to validate input variables before time series modeling.
 
@@ -73,15 +65,8 @@ Used to validate input variables before time series modeling.
 
 Tests predictive causality between AINI and log returns or volatility indices using:
 
-- **bootstrapping**: to create empirical p-values
+- **bootstrapping** with 10 000 shuffles & Rademacher weights to create empirical p-values
 - **Benjamini-Hochberg correction** to reduce the false-discovery-rate
-
-Supports both directions: `AINI ➝ returns` and `returns ➝ AINI`.
-
-## Transfer Entropy (TE)
-
-- KSG estimator for nonlinear, asymmetric dependencies
-- IDTxl framework with permutation-based significance testing
 
 ## Project Structure
 
@@ -117,7 +102,6 @@ AI_narrative_index/
 │   │   ├── stationarity_testing.py             # Perform ADF and PP stationarity tests
 │   │   ├── estimate_transfer_entropy.py        # Estimate Transfer Entropy between AINI and financial variables
 │   │   ├── estimate_granger_causality.py       # Estimate Granger causality with heteroskedasticity-aware bootstrapping
-│   │   ├── estimate_OLS.py                     # Estimate OLS for same-day returns with heteroskedasticity-aware bootstrapping
 │   │   ├── predict_binary_AINI_FinBERT.py      # Classify articles (AI-related vs. not) using custom FinBERT
 │   │   └── predict_AINI_FinBERT_window.py      # Classify with windowed context using FinBERT
 │   │
@@ -275,7 +259,6 @@ This repository forms the empirical foundation of a master's thesis in Economics
 
 - **Behavioral finance and narrative theory**
 - **NLP and deep learning with Transformers**
-- **Causal inference using both econometrics and information theory**
 
 ---
 
