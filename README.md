@@ -67,7 +67,7 @@ Predictive causality between AINI and financial variables is tested with:
 
 Regression specification (with VIX log growth as a market risk control):
 
-![Granger regression](GC VIX.png)  
+![alt text](<GC VIX-1.png>)
 ![Legend](gc legend svg.svg)  
 
 ---
