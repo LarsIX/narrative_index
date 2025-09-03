@@ -769,3 +769,94 @@ __all__ = [
     "rename_events",
     "make_event_name",
 ]
+
+def plot_stock_growth(
+    df: pd.DataFrame,
+    tickers,
+    start="2023-04-01",
+    end="2025-06-15",
+    group_size=5,
+    base=100.0,
+    save_dir=None,           # e.g. Path("reports/figures")
+    show=True
+):
+    """
+    Plot growth (Adj Close normalized to `base` at each ticker's first in-range date).
+    Creates N = ceil(len(tickers)/group_size) figures with equal x/y scales.
+
+    Parameters
+    ----------
+    df : DataFrame with columns ['Ticker','Adj Close','date'] (or 'Date')
+    tickers : iterable of ticker strings
+    start, end : date bounds (inclusive)
+    group_size : tickers per figure
+    base : starting index level per ticker (e.g. 100.0)
+    save_dir : if set, saves PNGs as 'growth_group_{i}.png'
+    show : whether to display the plots
+    """
+    d = df.copy()
+
+    # Ensure datetime column named 'date'
+    if "date" in d.columns:
+        d["date"] = pd.to_datetime(d["date"])
+    elif "Date" in d.columns:
+        d["date"] = pd.to_datetime(d["Date"])
+    else:
+        raise KeyError("DataFrame must have a 'date' or 'Date' column.")
+
+    # Filter by date + tickers; keep only necessary cols
+    start = pd.Timestamp(start)
+    end = pd.Timestamp(end)
+    d = d[(d["date"] >= start) & (d["date"] <= end) & (d["Ticker"].isin(tickers))]
+    d = d[["date", "Ticker", "Adj Close"]].dropna(subset=["Adj Close"])
+
+    if d.empty:
+        raise ValueError("No data after filtering. Check dates/tickers/columns.")
+
+    # Build per-ticker growth index normalized to first available point in range
+    d = d.sort_values(["Ticker", "date"])
+    first_vals = d.groupby("Ticker")["Adj Close"].transform("first")
+    d["Growth"] = base * (d["Adj Close"] / first_vals)
+
+    # Compute global y-limits for identical scales
+    ymin = d["Growth"].min()
+    ymax = d["Growth"].max()
+    pad = 0.03 * (ymax - ymin) if ymax > ymin else 1.0
+    ylims = (ymin - pad, ymax + pad)
+
+    # Consistent groups of tickers
+    tickers_sorted = sorted(set(tickers))
+    groups = [tickers_sorted[i:i+group_size] for i in range(0, len(tickers_sorted), group_size)]
+
+    if save_dir:
+        save_dir = Path(save_dir)
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+    figs = []
+    for gi, grp in enumerate(groups, start=1):
+        fig, ax = plt.subplots(figsize=(10, 5))
+        for t in grp:
+            sub = d[d["Ticker"] == t]
+            if sub.empty:
+                continue
+            ax.plot(sub["date"], sub["Growth"], linewidth=1.8, label=t)
+
+        ax.set_title(f"Growth (Adj Close, base={base}) — Group {gi}: {', '.join(grp)}")
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Index (base = {:.0f})".format(base))
+        ax.set_xlim(start, end)
+        ax.set_ylim(*ylims)
+        ax.legend(ncol=3, frameon=False, loc="upper left", bbox_to_anchor=(0, 1.02))
+        fig.autofmt_xdate()
+        plt.tight_layout()
+
+        if save_dir:
+            out = save_dir / f"growth_group_{gi}.png"
+            fig.savefig(out, dpi=300, bbox_inches="tight")
+
+        if show:
+            plt.show()
+        else:
+            figs.append(fig)
+
+    return figs if not show else None
