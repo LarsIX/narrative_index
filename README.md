@@ -67,19 +67,18 @@ Predictive causality between AINI and financial variables is tested with:
 
 Regression specification (with VIX log growth as a market risk control):
 
-![Granger regression](VIX_GC_formula.png)  
-![Legend](legend_GC.png)  
+![Granger regression](GC SVG.svg)  
+![Legend](gc legend svg.svg)  
 
 ---
 
 ## Selected Results
 
 - Stocks with strong AI exposure (e.g. NVIDIA, Broadcom) show **robust predictive links** from AINI → returns.  
-- Significance confirmed by **both analytic (HC3/HAC) and bootstrap p-values** after FDR correction.  
+- Significance confirmed by **both analytic (HC3) and bootstrap p-values** after FDR correction.  
 
 ![Scatter of coefficients](image.png)  
 
-*Significance on both methods = robust evidence of predictive causality.*  
 
 ---
 ## Project Structure
