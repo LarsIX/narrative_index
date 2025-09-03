@@ -71,7 +71,7 @@ Die Granger Kausalität zwischen AINI und Finanzvariablen wird getestet mittels:
 Regressionsspezifikation (mit VIX-Wachstumsrate als Kontrollvariable für Marktrisiko*):
 
 ![GC Formel VIX](<GC VIX-1.png>)  
-![Legende](<GC Legend-1-1.png>)
+![Legende](legende_klein-1.png)
 
 *Weitere Kontrollvariablen: Anzahl der täglichen Artikel, Marktindex (S&P 500) & Index für Halbleiter (SOX).
 
