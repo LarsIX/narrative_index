@@ -1,10 +1,10 @@
 # AI Narrative Index (AINI)
 
-Dieses Repository dokumentiert die vollständige Forschungspipeline zur Konstruktion des **AI Narrative Index (AINI)** — einer Zeitreihe, die misst, wie Künstliche Intelligenz (KI) in Finanznachrichten dargestellt und emotional gerahmt wird.  
+Dieses Repository dokumentiert die vollständige Forschungspipeline zur Konstruktion des **AI Narrative Index (AINI)** — einer Zeitreihe, die misst, wie Künstliche Intelligenz (KI) in Finanznachrichten dargestellt wird.  
 
-Die Indexwerte basieren auf Artikeln des **Wall Street Journal (WSJ)** (Zeitraum 2023–2025) und werden als erklärende Variablen zur Prognose von Aktienrenditen und Volatilität eingesetzt.  
+Die Indexwerte basieren auf Artikeln des **Wall Street Journal (WSJ)** (Zeitraum 2023–2025) und werden als erklärende Variablen zur Prognose von Aktienrenditen eingesetzt.  
 
-Das Projekt integriert **Transformer-basierte NLP-Methoden**, **manuelle Annotation**, **Deep-Learning-Feinabstimmung** sowie **statistische Inferenz** — und folgt dabei einer modularen, reproduzierbaren Architektur.  
+Das Projekt integriert **Transformer-basierte NLP-Methoden**, **manuelle Annotation**, **Deep-Learning-Finetuning** sowie **statistische Inferenz** — und folgt dabei einer modularen, reproduzierbaren Architektur.  
 
 Das folgende Flussdiagramm veranschaulicht den gesamten Prozess.*
 
