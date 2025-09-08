@@ -1,5 +1,7 @@
 # AI Narrative Index (AINI)
 
+**Note:** The English version of the README is available [here](https://github.com/LarsIX/narrative_index/blob/main/README%20-%20English.md).
+
 Dieses Repository dokumentiert die vollständige Forschungspipeline zur Konstruktion des **AI Narrative Index (AINI)** — einer Zeitreihe, die misst, wie Künstliche Intelligenz (KI) in Finanznachrichten dargestellt wird.  
 
 Die Indexwerte basieren auf Artikeln des **Wall Street Journal (WSJ)** (Zeitraum 2023–2025) und werden als erklärende Variablen zur Prognose von Aktienrenditen eingesetzt.  
