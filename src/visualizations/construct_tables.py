@@ -1,74 +1,58 @@
 # -*- coding: utf-8 -*-
 """
-Export regression / Granger-causality results to a DIN A4–friendly LaTeX longtable.
+Export regression / Granger-causality results to LaTeX or HTML.
 
-Key behavior
+Key features
 ------------
-- Renames 'p_x' -> 'n_lags' (kept), positioned right after 'AINI_variant' if present.
-- Drops columns: 'Direction', 'p_ret', 'N_obs', 'r2_u', 'N_boot', 'N_boot_valid'.
-- Appends significance stars to: 'BH_corr_F_pval' and 'BH_corr_F_pval_HC3'.
-- Uses LaTeX `longtable` (multi-page), sized to \\textwidth with very small font and tight spacing.
-- Escapes LaTeX special characters via `escape=True` (no manual underscore hacks needed).
-- Writes to: \\AI_narrative_index\\reports\\tables\\{output_filename}.tex
+- output_format: 'tex' (LaTeX) or 'html'
+- tex_mode: 'longtable' (standalone, non-floating) or 'tabular' (to \input inside a floating table)
+- Clean LaTeX output for β/γ headers (no Unicode errors)
+- NaN rendered as blanks
+- Text cells safely escaped (so escape=False is usable to allow math in headers)
 
-Stars:
-  *** for p < 0.01, ** for p < 0.05, * for p < 0.10
+Also includes simple PPTX helpers (optional).
 """
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Sequence
+import pandas as pd
+
+# Optional PPTX helpers
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN
-from pathlib import Path
-from typing import Optional, Sequence, Dict, List, Tuple
-import re
-import numpy as np
-import pandas as pd
+
 # ----------------------------- configuration -------------------------------- #
-# Columns to drop (exactly as requested; NOTE: p_x is kept via rename->n_lags)
+_OUTPUT_ORDER = [
+    "Model", "AINI_variant", "Period", "Ticker",
+    "β₀", "β1", "β2", "β3", "γ1", "γ2", "γ3",
+    "R^2", "R^2_adj",
+    "Analytical F_stat p", "Empirical F_stat p",
+    "BH Analytical p", "BH Empirical p",
+]
+
 _DROP_COLS = [
-    "Direction",
-    "p_ret",
-    "N_obs",
-    "r2_u",        # unadjusted R^2
-    "N_boot",
-    "N_boot_valid",
+    "Direction", "Lags",
+    "N_obs", "N_boot", "N_boot_valid",
+    "F_stat", "df_num", "df_den",
+    "BH_reject_F", "BH_reject_F_HC3",
+    "joint rej. (α=0.1)",
 ]
 
-# Preferred display order (only existing columns are kept, in this order)
-_PREFERRED_ORDER = [
-    "Ticker",
-    "AINI_variant",
-    "n_lags",                 # kept as exact name
-    "Year",
-    "F_stat",
-    "Original_F_pval",
-    "Empirical_F_pval",
-    "adj_r2_u",               # adjusted R^2 (kept if present)
-    "BH_corr_F_pval",
-    "BH_corr_F_pval_HC3",
-]
-
+# Columns that should be right-aligned (numeric-like)
+_NUMERIC_LIKE = {
+    "β₀", "β1", "β2", "β3", "γ1", "γ2", "γ3",
+    "R^2", "R^2_adj",
+    "Analytical F_stat p", "Empirical F_stat p",
+    "BH Analytical p", "BH Empirical p",
+}
 
 # ------------------------------- helpers ------------------------------------ #
 def _project_tables_dir() -> Path:
-    """Resolve \\AI_narrative_index\\reports\\tables relative to this file."""
     here = Path(__file__).resolve()
     project_root = here.parents[2]  # .../AI_narrative_index
     return project_root / "reports" / "tables"
-
-
-def _move_col_after(df: pd.DataFrame, col: str, after: str) -> pd.DataFrame:
-    """Move column `col` to immediately follow `after` when both exist."""
-    if col not in df.columns:
-        return df
-    cols = list(df.columns)
-    cols.remove(col)
-    if after in cols:
-        insert_pos = cols.index(after) + 1
-        cols.insert(insert_pos, col)
-        return df[cols]
-    return df
 
 
 def _stars_from_p(p: float) -> str:
@@ -88,50 +72,59 @@ def _stars_from_p(p: float) -> str:
     return ""
 
 
-def _fmt_p_with_stars(p: float, digits: int = 3) -> str:
-    """Format p-value with fixed decimals and append stars."""
+def _fmt_p(p: float, digits: int = 3) -> str:
+    """Format p-value with fixed decimals and floor at <0.00..01."""
     try:
         if pd.isna(p):
             return ""
         p = float(p)
-        base = f"<0.{('0'*(digits-1))}1" if p < 10 ** (-digits) else f"{p:.{digits}f}"
-        return f"{base}{_stars_from_p(p)}"
+        floor = 10 ** (-digits)
+        return f"<0.{('0'*(digits-1))}1" if p < floor else f"{p:.{digits}f}"
     except Exception:
         return ""
 
 
 def _column_format(columns: Sequence[str]) -> str:
     """
-    Build a compact LaTeX column format string for longtable.
-
-    - Right-align numeric-like columns to keep numbers tight.
-    - Remove outer padding with @{} to maximize textwidth usage.
+    Build LaTeX column spec: right-align numeric-like, left-align everything else.
+    Uses the *logical* column names (before math sanitization).
     """
-    numeric_like = {
-        "n_lags",
-        "Year",
-        "F_stat",
-        "Original_F_pval",
-        "Empirical_F_pval",
-        "adj_r2_u",
-        "BH_corr_F_pval",
-        "BH_corr_F_pval_HC3",
-    }
-    # Left (l) for text-like, Right (r) for numeric-like
-    spec = ["r" if c in numeric_like else "l" for c in columns]
+    spec = ["r" if c in _NUMERIC_LIKE else "l" for c in columns]
     return "@{}" + "".join(spec) + "@{}"
 
-def expand_year_range(val: str) -> str:
-        parts = val.split("_")
-        if all(p.isdigit() for p in parts):
-            expanded = []
-            for i, p in enumerate(parts):
-                if len(p) == 2:  # 2-digit year, prefix with '20'
-                    expanded.append("20" + p)
-                else:
-                    expanded.append(p)
-            return "-".join(expanded)
-        return val
+
+def _escape_latex_text(s: str) -> str:
+    """
+    Escape LaTeX specials in text cells so we can set escape=False overall
+    (needed to allow math in headers). NaN/None -> "".
+    """
+    if s is None or pd.isna(s):
+        return ""
+    s = str(s)
+    return (s.replace("\\", r"\textbackslash{}")
+             .replace("&", r"\&")
+             .replace("%", r"\%")
+             .replace("$", r"\$")
+             .replace("#", r"\#")
+             .replace("_", r"\_")
+             .replace("{", r"\{")
+             .replace("}", r"\}")
+             .replace("~", r"\textasciitilde{}")
+             .replace("^", r"\textasciicircum{}")
+             .replace("<", r"\textless{}")
+             .replace(">", r"\textgreater{}"))
+
+
+def _sanitize_latex_header(col: str) -> str:
+    """
+    Map Unicode β/γ + subscripts to LaTeX math headers.
+    Only column headers are transformed; body stays as text (escaped).
+    """
+    mapping = {
+        "β₀": r"$\beta_0$", "β1": r"$\beta_1$", "β2": r"$\beta_2$", "β3": r"$\beta_3$",
+        "γ1": r"$\gamma_1$", "γ2": r"$\gamma_2$", "γ3": r"$\gamma_3$",
+    }
+    return mapping.get(col, col)
 
 # ------------------------------- main API ----------------------------------- #
 def export_regression_table(
@@ -140,162 +133,188 @@ def export_regression_table(
     output_filename: str,
     *,
     p_digits: int = 3,
-    f_digits: int = 2,
-    r2_digits: int = 3,
-    font_size_cmd: str = "tiny",   # 'tiny' is smaller than 'scriptsize'
-    tabcolsep_pt: float = 2.0,     # even tighter spacing for A4 fit
+    coef_digits: int | None = None,
+    font_size_cmd: str = "tiny",
+    tabcolsep_pt: float = 2.0,
+    sort_by: Sequence[str] | None = None,
+    output_format: str = "tex",          # 'tex' or 'html'
+    tex_mode: str = "longtable",         # 'longtable' or 'tabular'
+    tex_include_caption: bool = True,    # only used when tex_mode='longtable'
 ) -> Path:
     """
-    Export regression/GC results to LaTeX `longtable` (DIN A4 friendly).
+    Export regression results to LaTeX or HTML.
 
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Input DataFrame with results. Expected columns (as available):
-        'Ticker','AINI_variant','p_x','n_lags','Year','F_stat',
-        'Original_F_pval','Empirical_F_pval','adj_r2_u',
-        'BH_corr_F_pval','BH_corr_F_pval_HC3'.
-    title : str
-        LaTeX caption for the table.
-    output_filename : str
-        Base filename; '.tex' is appended if missing.
+    - For a floating LaTeX table:
+        call with tex_mode='tabular', tex_include_caption=False,
+        then wrap the generated .tex file:
+            \begin{table}[ht]
+              \centering
+              \resizebox{\textwidth}{!}{\input{.../file.tex}}
+              \caption{... S\&P~500 ...}
+              \label{...}
+            \end{table}
 
-    Other Parameters
-    ----------------
-    p_digits : int, default=3
-        Decimals for p-values.
-    f_digits : int, default=2
-        Decimals for F-statistics.
-    r2_digits : int, default=3
-        Decimals for adjusted R².
-    font_size_cmd : str, default='tiny'
-        LaTeX size command to apply right before the longtable
-        (examples: 'tiny', 'scriptsize', 'footnotesize').
-    tabcolsep_pt : float, default=2.0
-        Value for \\tabcolsep (in pt) to tighten column spacing.
-
-    Returns
-    -------
-    pathlib.Path
-        Path to the written `.tex` file.
-
-    Notes
-    -----
-    - `p_x` is renamed to `n_lags` (and kept). The original `p_x` is then removed via the drop list.
-    - Drops only: 'Direction', 'p_ret', 'N_obs', 'r2_u', 'N_boot', 'N_boot_valid'.
-    - Star annotations are added only to BH-adjusted p-values.
-    - The output is a **top-level** `longtable` (no float/resizebox), with zero longtable
-      left/right margins, very small font, and tight column spacing to fit DIN A4.
+    - For a standalone longtable:
+        call with tex_mode='longtable' (default) and let this function add caption/label.
+        Do NOT wrap it in a floating table.
     """
     if not isinstance(df, pd.DataFrame):
         raise TypeError("df must be a pandas.DataFrame")
+    if output_format not in {"tex", "html"}:
+        raise ValueError("output_format must be 'tex' or 'html'")
+    if output_format == "tex" and tex_mode not in {"longtable", "tabular"}:
+        raise ValueError("tex_mode must be 'longtable' or 'tabular'")
 
-    # Resolve output path
     outdir = _project_tables_dir()
     outdir.mkdir(parents=True, exist_ok=True)
-    if not output_filename.endswith(".tex"):
-        output_filename += ".tex"
+
+    if not output_filename.endswith(f".{output_format}"):
+        output_filename = f"{output_filename}.{output_format}"
     out_path = outdir / output_filename
 
-    # 1) Rename p_x -> n_lags (keep)
+    # ---------------- normalize schema & values ---------------- #
     work = df.copy()
-    if "p_x" in work.columns:
-        work["n_lags"] = work["p_x"]
 
-    # 2) Drop the requested columns (p_x removed implicitly via rename+drop)
+    rename_map = {
+        "r2_u": "R^2",
+        "adj_r2_u": "R^2_adj",
+        "Original_F_pval": "Analytical F_stat p",
+        "Empirical_F_pval": "Empirical F_stat p",
+        "BH analytical p": "BH Analytical p",
+        "BH empirical p": "BH Empirical p",
+    }
+    for src, dst in rename_map.items():
+        if src in work.columns:
+            work[dst] = work[src]
+
+    # coefficient formatting
+    if coef_digits is not None:
+        for c in ["β₀", "β1", "β2", "β3", "γ1", "γ2", "γ3"]:
+            if c in work.columns:
+                work[c] = work[c].apply(lambda v: "" if pd.isna(v) else f"{float(v):.{coef_digits}f}")
+
+    # plain p-values
+    for pcol in ["Analytical F_stat p", "Empirical F_stat p"]:
+        if pcol in work.columns:
+            work[pcol] = work[pcol].apply(lambda v: _fmt_p(v, p_digits))
+
+    # BH p-values + stars based on BH Empirical p
+    stars_source = None
+    if "BH Empirical p" in work.columns:
+        stars_source = work["BH Empirical p"].apply(_stars_from_p)
+        work["BH Empirical p"] = work["BH Empirical p"].apply(lambda v: _fmt_p(v, p_digits))
+    if "BH Analytical p" in work.columns:
+        work["BH Analytical p"] = work["BH Analytical p"].apply(lambda v: _fmt_p(v, p_digits))
+    if stars_source is not None:
+        if "BH Empirical p" in work.columns:
+            work["BH Empirical p"] = work["BH Empirical p"] + stars_source
+        if "BH Analytical p" in work.columns:
+            work["BH Analytical p"] = work["BH Analytical p"] + stars_source
+
+    # drop unnecessary cols
     work = work.drop(columns=[c for c in _DROP_COLS if c in work.columns], errors="ignore")
 
-    # 3) Ensure n_lags is positioned after AINI_variant if both exist
-    work = _move_col_after(work, "n_lags", "AINI_variant")
+    # column order
+    cols = [c for c in _OUTPUT_ORDER if c in work.columns]
+    work = work[cols]
 
-    # 4) Keep/arrange a compact, explicit column order
-    ordered_cols = [c for c in _PREFERRED_ORDER if c in work.columns]
-    if ordered_cols:
-        work = work[ordered_cols]
+    # optional sorting
+    if sort_by:
+        missing = [c for c in sort_by if c not in work.columns]
+        if not missing:
+            work = work.sort_values(list(sort_by)).reset_index(drop=True)
 
-    # Year column: expand underscores to full year range
+    # ----------------------------- EXPORT ----------------------------- #
+    if output_format == "tex":
+        # Build column spec BEFORE header sanitization (based on logical names)
+        colspec = _column_format(work.columns)
 
-    if "Year" in work.columns:
-        work["Year"] = work["Year"].astype(str).apply(expand_year_range)
+        # Sanitize headers to LaTeX math (β/γ), avoid Unicode subscripts
+        header_cols = [_sanitize_latex_header(c) for c in work.columns]
 
+        # Sanitize text cells so we can set escape=False; blank out NaNs
+        obj_cols = list(work.select_dtypes(include="object").columns)
+        for c in obj_cols:
+            work[c] = work[c].apply(_escape_latex_text)
 
-    # 5) Formatting (use strings for display)
-    # F-stat
-    if "F_stat" in work.columns:
-        work["F_stat"] = work["F_stat"].apply(lambda v: "" if pd.isna(v) else f"{float(v):.{f_digits}f}")
+        # Replace DataFrame headers with sanitized versions
+        work.columns = header_cols
 
-    # Year column
+        # Prepare to_latex kwargs
+        to_latex_kwargs = dict(
+            index=False,
+            escape=False,       # allow math in headers
+            na_rep="",          # blank instead of NaN
+            column_format=colspec,
+            bold_rows=False,
+            multicolumn=False,
+            multicolumn_format="c",
+            longtable=(tex_mode == "longtable"),
+        )
+        if tex_mode == "longtable" and tex_include_caption:
+            to_latex_kwargs["caption"] = title
+            to_latex_kwargs["label"] = f"tab:{out_path.stem}"
 
-    if "Year" in work.columns:
-        work["Year"] = work["Year"].astype(str).str.replace("_", "-", regex=False)
+        latex_core = work.to_latex(**to_latex_kwargs)
 
-    # Adjusted R^2 (if present)
-    if "adj_r2_u" in work.columns:
-        work["adj_r2_u"] = work["adj_r2_u"].apply(lambda v: "" if pd.isna(v) else f"{float(v):.{r2_digits}f}")
-
-    # Plain p-values (no stars)
-    for pcol in ("Original_F_pval", "Empirical_F_pval"):
-        if pcol in work.columns:
-            work[pcol] = work[pcol].apply(
-                lambda v: ""
-                if pd.isna(v)
-                else (f"<0.{('0'*(p_digits-1))}1" if float(v) < 10 ** (-p_digits) else f"{float(v):.{p_digits}f}")
+        if tex_mode == "longtable":
+            # A4-friendly tweaks only for longtable
+            preamble = (
+                "% AUTO-GENERATED by export_regression_table\n"
+                "\\begingroup\n"
+                "\\setlength\\LTleft{0pt}\\setlength\\LTright{0pt}\n"
+                f"\\setlength\\tabcolsep{{{tabcolsep_pt}pt}}\n"
+                f"\\{font_size_cmd}\n"
             )
+            postamble = "\n\\endgroup\n"
+            out_path.write_text(preamble + latex_core + postamble, encoding="utf-8")
+        else:
+            # Plain tabular — safe to wrap in \begin{table} ... \end{table}
+            header = "% AUTO-GENERATED TABULAR (no caption/label) — safe to wrap inside a floating table\n"
+            out_path.write_text(header + latex_core, encoding="utf-8")
 
-    # BH-adjusted p-values WITH stars
-    if "BH_corr_F_pval" in work.columns:
-        work["BH_corr_F_pval"] = work["BH_corr_F_pval"].apply(lambda v: _fmt_p_with_stars(v, p_digits))
-    if "BH_corr_F_pval_HC3" in work.columns:
-        work["BH_corr_F_pval_HC3"] = work["BH_corr_F_pval_HC3"].apply(lambda v: _fmt_p_with_stars(v, p_digits))
+    elif output_format == "html":
+        html_core = (
+            work.style
+            .set_caption(title)
+            .set_table_styles([
+                {"selector": "caption", "props": [("caption-side", "top"), ("font-weight", "bold"), ("font-size", "120%")]},
+                {"selector": "th, td", "props": [("border", "1px solid #ddd"), ("padding", "4px 6px"), ("text-align", "center")]},
+                {"selector": "thead", "props": [("background-color", "#f2f2f2")]}
+            ])
+            .hide(axis="index")
+            .to_html()
+        )
+        html_doc = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"><title>{title}</title>
+<style>
+body {{ font-family: Arial, sans-serif; margin: 40px; }}
+table {{ border-collapse: collapse; width: 100%; font-size: 12px; }}
+</style>
+</head>
+<body>
+<h2>{title}</h2>
+{html_core}
+</body>
+</html>
+"""
+        out_path.write_text(html_doc, encoding="utf-8")
 
-    # 6) Column format (tight, right-align numerics)
-    colspec = _column_format(work.columns)
-
-    # 7) Build LaTeX longtable (do NOT wrap in table/resizebox)
-    # Use escape=True so underscores, %, etc. are escaped correctly.
-    latex_core = work.to_latex(
-        index=False,
-        longtable=True,
-        escape=True,
-        column_format=colspec,
-        caption=title,
-        label=f"tab:{out_path.stem}",
-        bold_rows=False,
-        multicolumn=False,
-        multicolumn_format="c",
-    )
-
-    # 8) A4-fit helpers: zero longtable margins, very small font, very tight col spacing
-    # Wrap in a group so the settings don't leak into the rest of the document.
-    preamble = (
-        "% AUTO-GENERATED by export_regression_table\n"
-        "\\begingroup\n"
-        f"\\setlength\\LTleft{{0pt}}\\setlength\\LTright{{0pt}}\n"
-        f"\\setlength\\tabcolsep{{{tabcolsep_pt}pt}}\n"
-        f"\\{font_size_cmd}\n"
-    )
-    postamble = "\n\\endgroup\n"
-
-    # 9) Write .tex
-    out_path.write_text(preamble + latex_core + postamble, encoding="utf-8")
     return out_path
 
-# Columns where positive values should be bolded
-BOLD_IF_POSITIVE_COLS = {'β₁','β₂','β₃','γ₁','γ₂','γ₃'}
+# ---------------- PPTX helpers (optional) ---------------- #
+BOLD_IF_POSITIVE_COLS = {'β₁','β₂','β₃','γ₁','γ₂','γ₃','β1','β2','β3','γ1','γ2','γ3'}
 
-# --- helpers ---
 def add_text_to_cell(cell, text: str, bold=False, base_size=12):
-    """
-    Write plain text to a PPTX cell.
-    If bold=True, only set bold. Do NOT change size or color.
-    """
     cell.text = ""
     p = cell.text_frame.paragraphs[0]
     p.alignment = PP_ALIGN.LEFT
     run = p.add_run()
     run.text = text
     run.font.size = Pt(base_size)
-    run.font.bold = bold  # no color changes
+    run.font.bold = bold
 
 def add_table_slide(prs: Presentation, title: str, headers, rows, font_size=12):
     slide = prs.slides.add_slide(prs.slide_layouts[5])
@@ -307,49 +326,36 @@ def add_table_slide(prs: Presentation, title: str, headers, rows, font_size=12):
 
     n_rows, n_cols = len(rows) + 1, len(headers)
     tbl = slide.shapes.add_table(
-        n_rows, n_cols,
-        Inches(0.5), Inches(1.0), Inches(9.0), Inches(0.4 + 0.3*n_rows)
+        n_rows, n_cols, Inches(0.5), Inches(1.0), Inches(9.0), Inches(0.4 + 0.3*n_rows)
     ).table
 
-    # headers
     for j, h in enumerate(headers):
         add_text_to_cell(tbl.cell(0, j), str(h), bold=False, base_size=font_size)
         for run in tbl.cell(0, j).text_frame.paragraphs[0].runs:
             run.font.bold = True
 
-    # body
     for i, row in enumerate(rows, start=1):
         for j, val in enumerate(row):
             col_name = headers[j]
             text = "not tested" if pd.isna(val) else str(val)
-
-            # Bold only if column in target set AND numeric positive
             make_bold = False
             if col_name in BOLD_IF_POSITIVE_COLS and pd.notna(val):
                 try:
                     make_bold = float(val) > 0
                 except Exception:
                     make_bold = False
-
             add_text_to_cell(tbl.cell(i, j), text, bold=make_bold, base_size=font_size)
 
-    # equal column widths
     for j in range(n_cols):
         tbl.columns[j].width = Inches(9.0 / n_cols)
-
     return slide
 
 def df_to_pptx(df: pd.DataFrame, outpath="df_tables.pptx", rows_per_slide=12):
     prs = Presentation()
     headers = list(df.columns)
-
     for start in range(0, len(df), rows_per_slide):
         chunk = df.iloc[start:start+rows_per_slide]
         rows = chunk.fillna("not tested").values.tolist()
-        add_table_slide(
-            prs, f"Rows {start+1}-{start+len(chunk)}",
-            headers, rows, font_size=12
-        )
-
+        add_table_slide(prs, f"Rows {start+1}-{start+len(chunk)}", headers, rows, font_size=12)
     prs.save(outpath)
     return Path(outpath).resolve()

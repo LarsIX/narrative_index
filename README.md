@@ -163,7 +163,7 @@ AI_narrative_index/
 ├── notebooks/
 │       ├── analyse_gc_results.ipynb           # Analyse von Regressionsergebnissen
 │       ├── benchmark_windows.ipynb            # Vergleicht Kontextfenster
-│       ├── compare_annotations.ipynb          # Konfliktlösung Annotationen
+│       ├── calc_betas.ipynb                   # Berechnung von CAPM betas & alphas
 │       ├── compare_class_variants.ipnyb       # Vergleicht Klassifikationsschemata 
 │       ├── exploratory_analysis_aini.ipynb    # Analyse AINI-Varianten
 │       ├── exploratory_analysis_labels.ipynb  # Analyse AI-Labels v. custom FinBERT

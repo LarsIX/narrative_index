@@ -5,23 +5,27 @@ CLI for estimating Granger causality (both directions) with Wild residual bootst
 - Defaults: n_boot=5000, fdr_alpha=0.1, min_obs=0, HAC covariance with auto NW lags.
 - AINI file inferred from version (w0,w1,w2,w3,binary).
 - Controls: must pass --control-var (string), plus optional --controls-file/--controls-lags.
-- NEW: --ar-align-with-px to set p_ret = p_x per run, aligning AR lag count with the independent variable.
+- --ar-align-with-px to set p_ret = p_x per run, aligning AR lag count with the independent variable.
 
-The modelling functions DO NOT save inside this CLI; we save a single combined CSV:
+The modelling functions DO NOT save inside this CLI:
     granger_causality_{control_var}_{version}.csv  (when using controls)
     granger_causality_{version}.csv               (without controls)
 
 Examples
 --------
 Run multiple versions with aligned control lags and aligned AR lags for p_x in {1,2,3}:
-control n_articles:
-python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var n_articles --controls-file data/processed/variables/n_articles.csv --controls-lags n_articles --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --p-ret 3 --n-boot 1 --min-obs 0 --outdir data/processed/variables
+no control :
+python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var none --p-x-range 1,3 --ar-align-with-px --p-ret 3 --n-boot 10000 --min-obs 0 --outdir data/processed/variables
 
 control VIX:
 python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var log_growth_VIX --controls-file data/processed/variables/log_growth_VIX.csv --controls-lags log_growth_VIX --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --p-ret 3 --n-boot 10000 --min-obs 0 --outdir data/processed/variables
 
 S&P 500:
 python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var log_growth_sp500 --controls-file data/processed/variables/log_growth_sp500.csv --controls-lags log_growth_sp500 --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --p-ret 3 --n-boot 10000 --min-obs 0 --outdir data/processed/variables
+log_growth_sox
+
+Sox:
+python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var log_growth_sox --controls-file data/processed/variables/log_growth_sox.csv --controls-lags log_growth_sox --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --p-ret 3 --n-boot 10000 --min-obs 0 --outdir data/processed/variables
 
 """
 
