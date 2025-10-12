@@ -36,7 +36,10 @@ def fetch_and_save_data(start_date, end_date, save_dir, tickers=None):
             "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA",
 
             # Additional AI-related leaders
-            "AVGO", "AMD", "TSM"
+            "AVGO", "AMD", "TSM", 
+
+            # controls
+            "^SOX", "^GSPC"
         ]
 
     # Download OHLCV data
