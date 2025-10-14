@@ -3,10 +3,10 @@ CLI tool to download stock market data.
 
 Usage:
 standard
-python run_load_financial_data.py --start-date 2023-04-01 --end-date 2025-07-16 
+python run_load_financial_data.py --start-date 2023-04-01 --end-date 2025-06-16 
 
 for gspc
-python run_load_financial_data.py --start-date 2023-04-01 --end-date 2025-07-16 --tickers '^GSPC'
+python run_load_financial_data.py --start-date 2023-04-01 --end-date 2025-06-16 --tickers '^GSPC'
 >> """
 
 from pathlib import Path

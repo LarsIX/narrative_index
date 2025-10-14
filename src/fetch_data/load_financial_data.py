@@ -39,7 +39,7 @@ def fetch_and_save_data(start_date, end_date, save_dir, tickers=None):
             "AVGO", "AMD", "TSM", 
 
             # controls
-            "^SOX", "^GSPC"
+            #"^SOX", "^GSPC"
         ]
 
     # Download OHLCV data

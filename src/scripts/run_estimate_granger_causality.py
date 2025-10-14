@@ -22,7 +22,7 @@ python run_estimate_granger_causality.py run-all-versions --versions w0  --versi
 
 S&P 500:
 python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var log_growth_sp500 --controls-file data/processed/variables/log_growth_sp500.csv --controls-lags log_growth_sp500 --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --p-ret 3 --n-boot 10000 --min-obs 0 --outdir data/processed/variables
-log_growth_sox
+
 
 Sox:
 python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var log_growth_sox --controls-file data/processed/variables/log_growth_sox.csv --controls-lags log_growth_sox --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --p-ret 3 --n-boot 10000 --min-obs 0 --outdir data/processed/variables

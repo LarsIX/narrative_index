@@ -377,7 +377,6 @@ def run_gc_mbboot_fdr(   # keep name for backwards compatibility
       - Benjamini–Hochberg FDR per (Ticker, Year, Direction)
       - Parallel estimation across (ticker, variant) jobs
 
-    Also computes per-(ticker, year) z-scores for `normalized_AINI` → `normalized_AINI_z`
     and includes it as an additional tested variant (only if std>0).
 
     Defaults
@@ -431,15 +430,7 @@ def run_gc_mbboot_fdr(   # keep name for backwards compatibility
         for ticker, d in merged.groupby("ticker"):
             d = d.sort_values("date").reset_index(drop=True)
 
-            # On-the-fly z for normalized_AINI
             eff_variants = list(aini_variants)
-            if "normalized_AINI" in d.columns:
-                s = pd.to_numeric(d["normalized_AINI"], errors="coerce")
-                mu, sd = s.mean(skipna=True), s.std(skipna=True)
-                if pd.notna(sd) and float(sd) > 0.0:
-                    d = d.copy()
-                    d["normalized_AINI_z"] = (s - mu) / (sd if sd > 1e-12 else 1e-12)
-                    eff_variants.append("normalized_AINI_z")
 
             for var in eff_variants:
                 if var not in d.columns:
@@ -712,13 +703,6 @@ def run_gc_mbboot_fdr_controls(
         for ticker, d in merged.groupby("ticker"):
             d = d.sort_values("date").reset_index(drop=True)
             eff_variants = list(aini_variants)
-            if "normalized_AINI" in d.columns:
-                s = pd.to_numeric(d["normalized_AINI"], errors="coerce")
-                mu, sd = s.mean(skipna=True), s.std(skipna=True)
-                if pd.notna(sd) and float(sd) > 0.0:
-                    d = d.copy()
-                    d["normalized_AINI_z"] = (s - mu) / (sd if sd > 1e-12 else 1e-12)
-                    eff_variants.append("normalized_AINI_z")
             for var in eff_variants:
                 if var in d.columns:
                     tasks.append((d, str(ticker), year_key, var))
