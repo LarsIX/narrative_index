@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -11,7 +11,8 @@ from statsmodels.tsa.stattools import adfuller, kpss
 from arch.unitroot import PhillipsPerron
 
 
-# ---------------- utilities ---------------- #
+# ============= utilities ============= #
+
 def _clean_series(x: pd.Series) -> pd.Series:
     return (
         pd.to_numeric(x, errors="coerce")
@@ -38,13 +39,14 @@ def _run_adf_pp_kpss(
 
 
 def _agree_stationary(adf_p: float, pp_p: float, kpss_p: float, alpha: float) -> bool:
-    # Conservative: ADF & PP reject unit root, KPSS does NOT reject stationarity
+    # ADF & PP reject unit root (p<alpha) AND KPSS fails to reject stationarity (p>alpha)
     if any(pd.isna([adf_p, pp_p, kpss_p])):
         return False
     return (adf_p < alpha) and (pp_p < alpha) and (kpss_p > alpha)
 
 
 def _subset_periods(df: pd.DataFrame, date_col: str) -> Dict[str, pd.DataFrame]:
+    """Return year-based subsets (no 'Full' slice here)."""
     d = df.copy()
     d[date_col] = pd.to_datetime(d[date_col])
     return {
@@ -57,7 +59,8 @@ def _subset_periods(df: pd.DataFrame, date_col: str) -> Dict[str, pd.DataFrame]:
     }
 
 
-# ---------------- core ---------------- #
+# ============= core ============= #
+
 def build_stationarity_html(
     df: pd.DataFrame,
     output_html: Path | str,
@@ -71,13 +74,12 @@ def build_stationarity_html(
     kpss_nlags: str | int = "auto",
     title: str = "Stationarity Tests by Measure (ADF / PP / KPSS)",
     save_combined_csv: Optional[Path | str] = None,
+    save_combined_tex: Optional[Path | str] = None,
 ) -> pd.DataFrame:
     """
-    Group by `measure_col`, sort by `date_col`, run ADF/PP/KPSS on `value_col`.
-    Writes ONE single HTML report with a section per measure (and optional period splits).
-    Returns the combined results DataFrame.
-
-    Parameters are defensive and minimal; your notebook just constructs the tidy df and calls this.
+    Input df must have columns: [date_col, measure_col, value_col].
+    Groups by measure, sorts by date, runs ADF/PP/KPSS on value, optionally per sub-period.
+    Writes ONE HTML report; optionally saves CSV and LaTeX longtable (single table for all measures).
     """
     required = {date_col, measure_col, value_col}
     missing = required - set(df.columns)
@@ -92,7 +94,6 @@ def build_stationarity_html(
     sections_html: List[str] = []
     toc_items: List[str] = []
 
-    # CSS (kept lightweight)
     css = """
     <style>
       body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }
@@ -103,9 +104,9 @@ def build_stationarity_html(
       th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: right; }
       th { background: #f7f7f7; }
       td:first-child, th:first-child, td:nth-child(2), th:nth-child(2) { text-align: left; }
-      .ok { background: #e8f5e9; }  /* green-ish */
-      .bad { background: #ffebee; } /* red-ish */
-      .warn { background: #fff8e1; } /* yellow-ish */
+      .ok { background: #e8f5e9; }
+      .bad { background: #ffebee; }
+      .warn { background: #fff8e1; }
       .small { font-size: 12px; color: #666; }
       .toc { margin: 12px 0 24px 0; padding-left: 16px; }
       .toc li { margin: 2px 0; }
@@ -114,14 +115,13 @@ def build_stationarity_html(
     """
 
     for measure, g in d0.groupby(measure_col, dropna=False):
-        g = g.dropna(subset=[value_col])
-        g = g.sort_values(date_col)
+        g = g.dropna(subset=[value_col]).sort_values(date_col)
         measure_name = str(measure) if pd.notna(measure) else "(NA)"
 
-        # Which slices to test?
-        slices = {"Full": g}
         if include_period_splits:
-            slices.update(_subset_periods(g, date_col=date_col))
+            slices = _subset_periods(g, date_col=date_col)
+        else:
+            slices = {"All": g}
 
         rows_measure: List[dict] = []
         for slice_name, sub in slices.items():
@@ -163,10 +163,8 @@ def build_stationarity_html(
                     "error": str(e),
                 })
 
-        # Collect
         all_rows.extend(rows_measure)
 
-        # Build measure table HTML with light highlighting
         tbl = pd.DataFrame(rows_measure).sort_values(["Measure", "Period"]).reset_index(drop=True)
 
         def _row_class(r):
@@ -174,16 +172,20 @@ def build_stationarity_html(
                 return "warn"
             return "ok" if r["agree_stationarity"] else "bad"
 
-        # Manually build HTML table for styling
         headers = ["Measure", "Period", "ADF_stat", "ADF_p", "PP_stat", "PP_p", "KPSS_stat", "KPSS_p", "agree_stationarity", "error"]
         thead = "<tr>" + "".join(f"<th>{h}</th>" for h in headers) + "</tr>"
         body_rows = []
         for _, r in tbl.iterrows():
             cls = _row_class(r)
-            tds = "".join(
-                f"<td>{'' if pd.isna(r[h]) else (f'{r[h]:.6g}' if isinstance(r[h], (int, float, np.floating)) else r[h])}</td>"
-                for h in headers
-            )
+            def _fmt(v):
+                if pd.isna(v):
+                    return ""
+                if isinstance(v, (int, np.integer)):
+                    return f"{int(v)}"
+                if isinstance(v, (float, np.floating)):
+                    return f"{v:.6g}"
+                return str(v)
+            tds = "".join(f"<td>{_fmt(r[h])}</td>" for h in headers)
             body_rows.append(f"<tr class='{cls}'>{tds}</tr>")
         table_html = f"<table><thead>{thead}</thead><tbody>{''.join(body_rows)}</tbody></table>"
 
@@ -193,9 +195,7 @@ def build_stationarity_html(
 
     combined = pd.DataFrame(all_rows).sort_values(["Measure", "Period"]).reset_index(drop=True)
 
-    # Serialize HTML
     joined_sections = "\n\n".join(sections_html)
-
     html = f"""<!doctype html>
 <html>
 <head>
@@ -225,14 +225,52 @@ def build_stationarity_html(
 </body>
 </html>"""
 
-
-
-    output_html = Path(output_html)
-    output_html.parent.mkdir(parents=True, exist_ok=True)
-    output_html.write_text(html, encoding="utf-8")
+    out_html = Path(output_html)
+    out_html.parent.mkdir(parents=True, exist_ok=True)
+    out_html.write_text(html, encoding="utf-8")
 
     if save_combined_csv:
         Path(save_combined_csv).parent.mkdir(parents=True, exist_ok=True)
         combined.to_csv(save_combined_csv, index=False)
+
+    if save_combined_tex:
+        def fmt_num(x):
+            if pd.isna(x):
+                return ""
+            if isinstance(x, (int, np.integer)):
+                return f"{int(x)}"
+            if isinstance(x, (float, np.floating)):
+                return f"{x:.6g}"
+            return str(x)
+
+        def latex_escape(s: str) -> str:
+            repl = {
+                "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#",
+                "_": r"\_", "{": r"\{", "}": r"\}", "~": r"\textasciitilde{}",
+                "^": r"\textasciicircum{}", "\\": r"\textbackslash{}"
+            }
+            return "".join(repl.get(ch, ch) for ch in str(s))
+
+        df_tex = combined.copy()
+        df_tex["Measure"] = df_tex["Measure"].map(latex_escape)
+        df_tex["agree_stationarity"] = df_tex["agree_stationarity"].map(lambda b: "Yes" if b else "No")
+        df_tex["error"] = df_tex["error"].fillna("")
+
+        cols = ["Measure","Period","ADF_stat","ADF_p","PP_stat","PP_p","KPSS_stat","KPSS_p","agree_stationarity","error"]
+        for c in ["ADF_stat","ADF_p","PP_stat","PP_p","KPSS_stat","KPSS_p"]:
+            df_tex[c] = df_tex[c].map(fmt_num)
+
+        latex_str = df_tex[cols].to_latex(
+            index=False,
+            longtable=True,
+            escape=False,
+            column_format="llrrrrrrrrl",
+            bold_rows=False,
+            multicolumn=False
+        )
+
+        tex_path = Path(save_combined_tex)
+        tex_path.parent.mkdir(parents=True, exist_ok=True)
+        tex_path.write_text(latex_str, encoding="utf-8")
 
     return combined
