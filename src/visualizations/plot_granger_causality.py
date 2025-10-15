@@ -12,7 +12,7 @@ def plot_aini_lags_by_year(gc_by_year, lag='t-1', aini_var_name="Variable", figs
     Create strip plots of Granger regression coefficients (e.g., t-1) across years and AINI variants.
 
     Each subplot represents one year, with points grouped by AINI variant and colored by ticker symbol.
-    Only coefficients with non-missing values for the specified lag are shown.
+    Only coefficients with non-fmissing values for the specified lag are shown.
 
     Parameters
     ----------

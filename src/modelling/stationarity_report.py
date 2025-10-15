@@ -135,7 +135,6 @@ def build_stationarity_html(
                     "PP_stat": np.nan, "PP_p": np.nan,
                     "KPSS_stat": np.nan, "KPSS_p": np.nan,
                     "agree_stationarity": False,
-                    "error": f"too_few_obs(<{min_obs})",
                 })
                 continue
 
@@ -150,7 +149,6 @@ def build_stationarity_html(
                     "PP_stat": pp_stat, "PP_p": pp_p,
                     "KPSS_stat": kpss_stat, "KPSS_p": kpss_p,
                     "agree_stationarity": _agree_stationary(adf_p, pp_p, kpss_p, alpha),
-                    "error": "",
                 })
             except Exception as e:
                 rows_measure.append({
@@ -160,7 +158,6 @@ def build_stationarity_html(
                     "PP_stat": np.nan, "PP_p": np.nan,
                     "KPSS_stat": np.nan, "KPSS_p": np.nan,
                     "agree_stationarity": False,
-                    "error": str(e),
                 })
 
         all_rows.extend(rows_measure)
@@ -168,11 +165,9 @@ def build_stationarity_html(
         tbl = pd.DataFrame(rows_measure).sort_values(["Measure", "Period"]).reset_index(drop=True)
 
         def _row_class(r):
-            if r["error"]:
-                return "warn"
             return "ok" if r["agree_stationarity"] else "bad"
 
-        headers = ["Measure", "Period", "ADF_stat", "ADF_p", "PP_stat", "PP_p", "KPSS_stat", "KPSS_p", "agree_stationarity", "error"]
+        headers = ["Measure", "Period", "ADF_stat", "ADF_p", "PP_stat", "PP_p", "KPSS_stat", "KPSS_p", "agree_stationarity"]
         thead = "<tr>" + "".join(f"<th>{h}</th>" for h in headers) + "</tr>"
         body_rows = []
         for _, r in tbl.iterrows():
@@ -254,9 +249,9 @@ def build_stationarity_html(
         df_tex = combined.copy()
         df_tex["Measure"] = df_tex["Measure"].map(latex_escape)
         df_tex["agree_stationarity"] = df_tex["agree_stationarity"].map(lambda b: "Yes" if b else "No")
-        df_tex["error"] = df_tex["error"].fillna("")
 
-        cols = ["Measure","Period","ADF_stat","ADF_p","PP_stat","PP_p","KPSS_stat","KPSS_p","agree_stationarity","error"]
+
+        cols = ["Measure","Period","ADF_stat","ADF_p","PP_stat","PP_p","KPSS_stat","KPSS_p","agree_stationarity"]
         for c in ["ADF_stat","ADF_p","PP_stat","PP_p","KPSS_stat","KPSS_p"]:
             df_tex[c] = df_tex[c].map(fmt_num)
 
