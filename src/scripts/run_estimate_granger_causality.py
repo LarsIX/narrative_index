@@ -1,33 +1,68 @@
 """
-CLI for estimating Granger causality (both directions) with Wild residual bootstrap and BH-FDR.
+Run Granger-causality estimations for multiple AINI variants
+(w0, w1, w2, binary) while controlling for C (here VIX example) 
 
-- Supports a lag *range* for AINI lags, e.g. --p-x-range 1,3 runs p_x in {1,2,3}.
-- Defaults: n_boot=5000, fdr_alpha=0.1, min_obs=0, HAC covariance with auto NW lags.
-- AINI file inferred from version (w0,w1,w2,w3,binary).
-- Controls: must pass --control-var (string), plus optional --controls-file/--controls-lags.
-- --ar-align-with-px to set p_ret = p_x per run, aligning AR lag count with the independent variable.
+Command:
+    python run_estimate_granger_causality.py run-all-versions
+        --versions w0 --versions w1 --versions w2 --versions binary
+        --control-var VIX
+        --controls-file data/processed/variables/log_growth_VIX.csv
+        --controls-lags log_growth_closed
+        --p-x-range 1,3
+        --controls-align-with-px
+        --ar-align-with-px
+        --n-boot 10000
+        --min-obs 0
+        --outdir data/processed/variables
+PowerShell Oneliner:
+python run_estimate_granger_causality.py run-all-versions --versions w0 --versions w1 --versions w2 --versions binary --control-var VIX --controls-file data/processed/variables/log_growth_VIX.csv --controls-lags log_growth_closed --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --n-boot 10000 --min-obs 0 --outdir data/processed/variables
+python run_estimate_granger_causality.py run-all-versions --versions w0 --versions w1 --versions w2 --versions binary --control-var log_growth_sp500 --controls-file data/processed/variables/log_growth_sp500.csv --controls-lags log_growth_closed --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --n-boot 10000 --min-obs 0 --outdir data/processed/variables
 
-The modelling functions DO NOT save inside this CLI:
-    granger_causality_{control_var}_{version}.csv  (when using controls)
-    granger_causality_{version}.csv               (without controls)
+        
+Description:
+    Executes the full Granger-causality pipeline across all AINI variants,
+    using the log-growth of the VIX as a control variable. Each run estimates
+    bidirectional causality between AINI and asset returns with 1–3 lags of
+    both AINI and the VIX. The number of return lags (AR terms) is aligned
+    with the AINI lag length for consistency.
 
-Examples
---------
-Run multiple versions with aligned control lags and aligned AR lags for p_x in {1,2,3}:
-no control :
-python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var none --p-x-range 1,3 --ar-align-with-px --p-ret 3 --n-boot 10000 --min-obs 0 --outdir data/processed/variables
+Parameters:
+    --versions               List of AINI versions (sentiment window setups)
+                             to process sequentially.
+    --control-var             Label for the control variable ("VIX"), used
+                             only in output filenames.
+    --controls-file           Path to CSV containing the control variable;
+                             must include columns 'date' and 'log_growth_closed'.
+    --controls-lags           Column name in the CSV to use as control variable;
+                             specifies which variable is lagged and added to the model.
+    --p-x-range               Range of AINI lags to test (here 1–3).
+    --controls-align-with-px  Ensures control-variable lag count equals AINI lag count.
+    --ar-align-with-px        Ensures return autoregressive lag count equals AINI lag count.
+    --n-boot                  Number of wild bootstrap replications (10,000) for
+                             empirical p-values.
+    --min-obs                 Minimum observations required for estimation (0 = include all).
+    --outdir                  Output directory where the results CSV files will be saved.
 
-control VIX:
-python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var log_growth_VIX --controls-file data/processed/variables/log_growth_VIX.csv --controls-lags log_growth_VIX --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --p-ret 3 --n-boot 10000 --min-obs 0 --outdir data/processed/variables
+Outputs:
+    For each AINI version, a CSV file is written to:
+        data/processed/variables/granger_causality_VIX_<version>.csv
 
-S&P 500:
-python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var log_growth_sp500 --controls-file data/processed/variables/log_growth_sp500.csv --controls-lags log_growth_sp500 --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --p-ret 3 --n-boot 10000 --min-obs 0 --outdir data/processed/variables
+    Each file contains results for both causal directions (AINI→RET and RET→AINI),
+    including:
+        - Analytic (HAC/HC3) and bootstrap F-statistics and p-values
+        - Benjamini–Hochberg FDR-adjusted significance indicators
+        - Coefficients for AINI lags, return lags, and VIX control lags
+        - R² and adjusted R² values for each regression
 
+Example outputs include columns:
+    'A2R_beta_ctrl_log_growth_closed_lag1' ... '_lag3'
+    'R2A_beta_ctrl_log_growth_closed_lag1' ... '_lag3'
 
-Sox:
-python run_estimate_granger_causality.py run-all-versions --versions w0  --versions w1 --versions w2 --versions binary --control-var log_growth_sox --controls-file data/processed/variables/log_growth_sox.csv --controls-lags log_growth_sox --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --p-ret 3 --n-boot 10000 --min-obs 0 --outdir data/processed/variables
-
+Verification:
+    The presence of these *_beta_ctrl_* columns confirms that VIX was
+    successfully included as a control variable.
 """
+
 
 from __future__ import annotations
 
@@ -357,6 +392,145 @@ def run_all_versions(
             ar_align_with_px=ar_align_with_px,
             p_ret=p_ret,
         )
+
+@app.command("run-vix-tests")
+def run_vix_tests(
+    version: str = typer.Option(..., help="AINI version tag (e.g., w0, w1, w2, w3, binary)."),
+    vix_file: Path = typer.Option(..., help="Path to VIX CSV (must contain 'date' and a VIX column)."),
+    vix_col: str = typer.Option("log_growth_closed", help="Column name in VIX CSV to use (e.g., 'log_growth_closed')."),
+    aini_variants: Optional[str] = typer.Option(None, help="Comma-separated AINI variants; defaults to internal list."),
+    p_vix: int = typer.Option(3, help="VIX AR lags."),
+    p_ret: int = typer.Option(1, help="Return lags in RET→VIX test."),
+    p_x_range: Optional[str] = typer.Option("1,3", help="Range for AINI lags, e.g., '1,3' runs p_x in {1,2,3}."),
+    min_obs: int = typer.Option(60),
+    n_boot: int = typer.Option(1000),
+    weight_dist: str = typer.Option("rademacher"),
+    fdr_alpha: float = typer.Option(0.05),
+    cov_for_analytic: str = typer.Option("HAC"),
+    hac_lags: Optional[int] = typer.Option(None),
+    seed: int = typer.Option(42),
+    n_jobs: int = typer.Option(-1),
+    outdir: Optional[Path] = typer.Option(None),
+):
+    """
+    Tests RET→VIX and AINI→VIX by merging an external VIX CSV (with columns 'date' and VIX series)
+    into fin_data on 'date', then calling run_vix_causality_tests with vix_col.
+    """
+    typer.echo(f"[INFO] VIX tests for version={version}")
+    typer.echo(f"[INFO] VIX file: {vix_file} | VIX column: {vix_col}")
+
+    #  Load AINI and financial data 
+    aini_path = infer_aini_file_from_version(version)
+    if not aini_path.exists():
+        raise FileNotFoundError(f"AINI file not found: {aini_path}")
+    aini_df = pd.read_csv(aini_path)
+
+    fin_path = src_dir.parent / "data" / "raw" / "financial" / "full_daily_2023_2025.csv"
+    fin_data = pd.read_csv(fin_path)
+
+    #  Parse dates and standardize fin_data 'date'
+    fin_data["Date"] = pd.to_datetime(fin_data["Date"])
+    fin_data["date"] = pd.to_datetime(fin_data["Date"])
+
+    #  Load VIX CSV and merge onto fin_data by 'date'
+    vix_path = Path(vix_file)
+    if not vix_path.exists():
+        raise FileNotFoundError(f"VIX file not found: {vix_path}")
+    vix_df = pd.read_csv(vix_path)
+
+    if "date" not in vix_df.columns:
+        raise ValueError("VIX CSV must contain a 'date' column.")
+    if vix_col not in vix_df.columns:
+        raise ValueError(f"VIX CSV does not contain the requested column '{vix_col}'.")
+
+    vix_df = vix_df.copy()
+    vix_df["date"] = pd.to_datetime(vix_df["date"])
+
+    # Keep only date + chosen VIX series; prevent accidental duplicate column names
+    vix_df = vix_df[["date", vix_col]].rename(columns={vix_col: vix_col})
+
+    # Merge on date  
+    fin_merged = pd.merge(fin_data, vix_df, on="date", how="left")
+
+    # Quick sanity log
+    miss = fin_merged[vix_col].isna().sum()
+    typer.echo(f"[INFO] After merging VIX: rows={len(fin_merged)}, missing {vix_col}={miss}")
+
+    # --- Variants & p_x range
+    variants_list = [v.strip() for v in aini_variants.split(",")] if aini_variants else None
+    lr = parse_range(p_x_range)
+    lag_values = list(range(lr[0], lr[1] + 1)) if lr else [1]
+
+    #  Run tests per p_x and combine
+    from modelling.estimate_granger_causality import run_vix_causality_tests  # local import to ensure availability
+    
+    frames: List[pd.DataFrame] = []
+    for px in lag_values:
+        typer.echo(f"[RUN ] VIX tests with p_x={px}, p_vix={px}, p_ret={px}")
+        df = run_vix_causality_tests(
+            aini_df=aini_df,
+            fin_data=fin_merged,        #  pass merged frame containing vix_col
+            version=version,
+            vix_col=vix_col,
+            aini_variants=variants_list,
+            p_vix=px,
+            p_ret=px,
+            p_x=px,
+            min_obs=min_obs,
+            n_boot=n_boot,
+            seed=seed,
+            fdr_alpha=fdr_alpha,
+            cov_for_analytic=cov_for_analytic,
+            hac_lags=hac_lags,
+            weight_dist=weight_dist,
+            save_csv=False,
+            outdir=outdir,
+            outname=None,
+            n_jobs=n_jobs,
+        )
+        df["p_x"] = px
+        frames.append(df)
+
+    combined = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    typer.echo(f"[OK] VIX test results shape: {combined.shape}")
+
+    #  Save once
+    outdir = _resolve_outdir(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    outname = f"vix_causality_{version}_{vix_col}.csv"
+    outpath = outdir / outname
+    combined.to_csv(outpath, index=False, encoding="utf-8-sig")
+    typer.echo(f"[SAVE] {outpath}")
+
+@app.command("run-vix-tests-all")
+def run_vix_tests_all(
+    versions: List[str] = typer.Option(["w0","w1","w2","binary"], "--versions"),
+    vix_file: Path = typer.Option(...),
+    vix_col: str = typer.Option("log_growth_closed"),
+    p_x_range: str = "1,3",
+    p_vix: int = 3,
+    p_ret: int = 1,
+    min_obs: int = 60,
+    n_boot: int = 10000,
+    weight_dist: str = "rademacher",
+    fdr_alpha: float = 0.05,
+    cov_for_analytic: str = "HAC",
+    hac_lags: Optional[int] = None,
+    seed: int = 42,
+    n_jobs: int = -1,
+    outdir: Optional[Path] = None,
+    aini_variants: Optional[str] = None,
+):
+    for v in versions:
+        run_vix_tests(
+        version=v, vix_file=vix_file, vix_col=vix_col,
+        aini_variants=aini_variants, p_vix=p_vix, p_ret=p_ret,
+        p_x_range=p_x_range, min_obs=min_obs, n_boot=n_boot,
+        weight_dist=weight_dist, fdr_alpha=fdr_alpha,
+        cov_for_analytic=cov_for_analytic, hac_lags=hac_lags,
+        seed=seed, n_jobs=n_jobs, outdir=outdir,
+    )
+
 
 
 if __name__ == "__main__":

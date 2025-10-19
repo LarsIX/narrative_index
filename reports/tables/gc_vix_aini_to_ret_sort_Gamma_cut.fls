@@ -1,0 +1,6 @@
+PWD C:/Users/PC/Desktop/Masterarbeit/AI_narrative_index/reports/tables
+INPUT c:/texlive/2024/texmf.cnf
+INPUT c:/texlive/2024/texmf-dist/web2c/texmf.cnf
+INPUT c:/texlive/2024/texmf-var/web2c/pdftex/pdflatex.fmt
+INPUT gc_vix_aini_to_ret_sort_Gamma_cut.tex
+OUTPUT gc_vix_aini_to_ret_sort_Gamma_cut.log

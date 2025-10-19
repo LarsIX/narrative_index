@@ -1,0 +1,8 @@
+PWD C:/Users/PC/Desktop/Masterarbeit/AI_narrative_index/reports/tables
+INPUT c:/texlive/2024/texmf.cnf
+INPUT c:/texlive/2024/texmf-dist/web2c/texmf.cnf
+INPUT c:/texlive/2024/texmf-var/web2c/pdftex/pdflatex.fmt
+INPUT gc_aini_to_vix.tex
+OUTPUT gc_aini_to_vix.log
+INPUT c:/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map
+INPUT c:/texlive/2024/texmf-dist/fonts/tfm/public/cm/cmti10.tfm

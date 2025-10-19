@@ -1,0 +1,50 @@
+{\tiny
+\setlength{\tabcolsep}{2.0pt}
+\renewcommand{\arraystretch}{1.03}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+
+\begin{tabularx}{\textwidth}{@{}X@{\hspace{0.5pt}}X@{\hspace{0.5pt}}X@{\hspace{0.5pt}}X@{\hspace{2.0pt}} r r r r r r r r@{}}
+\toprule
+\multicolumn{12}{c}{\textbf{Granger–Causality: jointly significant results (Returns $\to$ AINI, VIX-controlled)}}\\
+\midrule
+Model & $AINI^{\mathrm{var}}$ & Period & Ticker & $\beta_{1}$ & $\zeta_{1}$ & $\gamma_{1}$ & $\gamma_{2}$ & $\gamma_{3}$ & $R^{2}_{\mathrm{adj}}$ & $p^{\mathrm{BH}}_{a}$ & $p^{\mathrm{BH}}_{e}$ \\
+\midrule
+\endfirsthead
+\toprule
+\multicolumn{12}{c}{\textbf{Granger–Causality: jointly significant results (continued)}}\\
+\midrule
+Model & $AINI^{\mathrm{var}}$ & Period & Ticker & $\beta_{1}$ & $\zeta_{1}$ & $\gamma_{1}$ & $\gamma_{2}$ & $\gamma_{3}$ & $R^{2}_{\mathrm{adj}}$ & $p^{\mathrm{BH}}_{a}$ & $p^{\mathrm{BH}}_{e}$ \\
+\midrule
+\endhead
+\midrule
+\multicolumn{12}{r}{\small Continued on next page}\\
+\midrule
+\endfoot
+\bottomrule
+\captionsetup{belowskip=6pt}
+\caption{Signif.: * $p<0.10$, ** $p<0.05$, *** $p<0.01$.}
+\\
+\endlastfoot
+custom & $EMA^{0.2}$ & 2024-2025 & MSFT & -0.089 &  & 1.007 & -0.157 &  & 0.761 & 0.06* & 0.08* \\
+w1 & $EMA^{0.2}$ & 2024-2025 & BOTZ & 0.214 &  & 0.993 & -0.071 &  & 0.850 & 0.10* & 0.08* \\
+w1 & $EMA^{0.2}$ & 2024-2025 & ROBO & 0.284 &  & 0.981 & -0.057 &  & 0.851 & 0.06* & 0.04** \\
+w1 & $EMA^{0.2}$ & 2024-2025 & ROBO & 0.287 &  & 0.931 &  &  & 0.850 & 0.01** & 0.01** \\
+w1 & $EMA^{0.2}$ & 2024-2025 & BOTZ & 0.217 &  & 0.931 &  &  & 0.849 & 0.03** & 0.05* \\
+w1 & $EMA^{0.2}$ & 2024-2025 & AIQ & 0.244 &  & 0.927 &  &  & 0.847 & 0.04** & 0.08* \\
+custom & $EMA^{0.2}$ & 2023 & BOTZ & 0.467 &  & 0.927 & -0.244 & 0.054 & 0.586 & 0.05** & 0.04** \\
+w2 & $EMA^{0.2}$ & 2024-2025 & ROBO & 0.225 &  & 0.918 &  &  & 0.825 & 0.03** & 0.04** \\
+w1 & $EMA^{0.2}$ & 2023-2025 & BOTZ & 0.169 &  & 0.911 & -0.020 &  & 0.792 & 0.07* & 0.07* \\
+w1 & $EMA^{0.2}$ & 2023-2025 & BOTZ & 0.172 &  & 0.896 &  &  & 0.790 & 0.05** & 0.08* \\
+w1 & $EMA^{0.2}$ & 2023-2025 & AIQ & 0.183 &  & 0.893 &  &  & 0.789 & 0.07* & 0.10* \\
+w1 & $EMA^{0.2}$ & 2023-2025 & MSFT & 0.092 &  & 0.890 &  &  & 0.789 & 0.05** & 0.06* \\
+custom & $EMA^{0.2}$ & 2024 & GOOGL & -0.059 &  & 0.858 & -0.031 &  & 0.684 & 0.08* & 0.09* \\
+w1 & $EMA^{0.2}$ & 2024 & ROBO & 0.210 &  & 0.848 &  &  & 0.713 & 0.05* & 0.06* \\
+w1 & $EMA^{0.2}$ & 2024 & META & -0.082 &  & 0.839 &  &  & 0.715 & 0.06* & 0.08* \\
+w2 & $EMA^{0.2}$ & 2024 & ROBO & 0.181 &  & 0.806 &  &  & 0.655 & 0.04** & 0.08* \\
+w1 & $EMA^{0.2}$ & 2024 & ROBO & 0.212 &  & 0.797 & 0.058 &  & 0.711 & 0.04** & 0.07* \\
+w1 & $EMA^{0.2}$ & 2023-2024 & META & -0.068 &  & 0.788 &  &  & 0.623 & 0.07* & 0.09* \\
+w1 & $EMA^{0.2}$ & 2024 & META & -0.084 &  & 0.780 & 0.066 &  & 0.713 & 0.09* & 0.09* \\
+custom & $EMA^{0.2}$ & 2023 & AIQ & 0.536 &  & 0.768 &  &  & 0.589 & 0.09* & 0.08* \\
+\end{tabularx}
+}

@@ -260,8 +260,7 @@ def run_stationarity_sox_gspc(
 _AINI_LABEL_MAP = {
     "EMA_02": r"EMA_{0.2}",
     "EMA_08": r"EMA_{0.8}",
-    "normalized_AINI": r"AINI^{\mathrm{norm}}",
-    "normalized_AINI_z": r"AINI^{z}",
+    "normalized_AINI": r"AINI^{\mathrm{norm}}"
 }
 
 
@@ -285,12 +284,12 @@ def test_stationarity_aini_variants(
     """
     Run ADF, PP, KPSS for AINI measures over standard periods.
     Expected columns: ['date', <AINI columns>]
-    Default tests: EMA_02, EMA_08, normalized_AINI, normalized_AINI_z
+    Default tests: EMA_02, EMA_08, normalized_AINI
     """
     var_path, table_path = _project_paths()
 
     if aini_cols is None:
-        aini_cols = ["EMA_02", "EMA_08", "normalized_AINI", "normalized_AINI_z"]
+        aini_cols = ["EMA_02", "EMA_08", "normalized_AINI"]
 
     df = aini_data.copy()
     if "date" not in df.columns:
