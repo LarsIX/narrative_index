@@ -17,6 +17,7 @@ Command:
 PowerShell Oneliner:
 python run_estimate_granger_causality.py run-all-versions --versions w0 --versions w1 --versions w2 --versions binary --control-var VIX --controls-file data/processed/variables/log_growth_VIX.csv --controls-lags log_growth_closed --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --n-boot 10000 --min-obs 0 --outdir data/processed/variables
 python run_estimate_granger_causality.py run-all-versions --versions w0 --versions w1 --versions w2 --versions binary --control-var log_growth_sp500 --controls-file data/processed/variables/log_growth_sp500.csv --controls-lags log_growth_closed --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --n-boot 10000 --min-obs 0 --outdir data/processed/variables
+python run_estimate_granger_causality.py run-all-versions --versions w0 --versions w1 --versions w2 --versions binary --control-var log_growth_n_art --controls-file data/processed/variables/n_articles_log.csv --controls-lags log_growth_closed --p-x-range 1,3 --controls-align-with-px --ar-align-with-px --n-boot 10000 --min-obs 0 --outdir data/processed/variables
 
         
 Description:
