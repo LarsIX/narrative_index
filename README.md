@@ -1,7 +1,7 @@
 # AI Narrative Index (AINI)
 
 **English version:** [here](https://github.com/LarsIX/narrative_index/blob/main/README%20-%20English.md)
-**Finale Thesis:** [here](https://github.com/LarsIX/narrative_index/blob/main/README%20-%20English.md)
+**Final Thesis:** [here](https://github.com/LarsIX/narrative_index/tree/main/reports/thesis)
 ---
 
 ## Überblick
