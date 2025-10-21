@@ -1,106 +1,133 @@
 # AI Narrative Index (AINI)
 
-This repository documents the complete research pipeline for constructing the **AI Narrative Index (AINI)** — a time series measuring how Artificial Intelligence (AI) is represented in financial news.  
-
-The index values are based on articles from the **Wall Street Journal (WSJ)** (2023–2025) and are used as explanatory variables for predicting stock returns.  
-
-The project integrates **Transformer-based NLP methods**, **manual annotation**, **deep learning fine-tuning**, and **statistical inference** — following a modular and reproducible architecture.  
-
-The flowchart below illustrates the entire process.*  
-
-![Flowchart](https://github.com/user-attachments/assets/1296faff-9172-4a18-af42-16b829f4c823)
-
-*The process is shown in English since the entire thesis is written in English.
+**Deutsche Version:** [hier](https://github.com/LarsIX/narrative_index/blob/main/README.md)
 
 ---
 
-## Research Objectives
+## Overview
 
-- **Development of multiple variants of the AI Narrative Index (AINI)** using Transformer models  
-- **Quantification of narrative hype effects** on market dynamics via Granger causality  
-- **Ensuring scientific validity** through double-coding annotation, diagnostic tests, and resampling-based inference  
+This repository documents the complete research and implementation pipeline for constructing the **AI Narrative Index (AINI)** — a time series measuring how Artificial Intelligence (AI) is represented in financial news.  
+To the author’s knowledge, this is the **first technology-specific hype index** that quantitatively captures narrative attention and sentiment toward AI.
+
+The project integrates **Transformer-based NLP**, **deep learning**, and **econometric inference** within a **modular and reproducible architecture**.
+
+![Flowchart](https://github.com/user-attachments/assets/1296faff-9172-4a18-af42-16b829f4c823)
+
+*Note: The flowchart is shown in English, as the underlying research and thesis are written in English.*
+
+---
+
+## Research Goals
+
+- Develop multiple **Transformer-based variants** of the AINI (different context windows and FinBERT fine-tuning)
+- Quantify **narrative hype effects on financial markets** using Granger causality
+- Ensure **scientific validity** through double annotation, diagnostic testing, and resampling-based inference
 
 ---
 
 ## Construction of the AINI
 
-The measurement combines **human annotation, Transformer models, and lexicon-based methods**.
+The index combines **manual annotation**, **fine-tuned language models**, and **lexicon-based methods** to identify and quantify AI-related narratives in financial texts.
 
-### 1. Manual Annotation & FinBERT Fine-Tuning
+### 1. Manual Annotation & Fine-tuning of FinBERT
 
-- Creation of a manually annotated dataset with **independent double annotation** and subsequent verification (double-blind).  
-- Annotation of **AI relevance** (binary classification).  
+- Creation of a double-annotated dataset to identify **AI-related articles**  
+- Fine-tuning of a **FinBERT model** on this dataset for binary classification (“about AI” / “not about AI”)  
+- Application of the model to **Wall Street Journal (WSJ)** articles (2023–2025)  
+- Execution of a **sentiment analysis** using [ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert) on identified narratives  
+- Normalization, aggregation, and exponential smoothing of sentiment outputs to produce a **daily time series**
 
-- Fine-tuning of a **FinBERT model** using:  
-  - A class-weighted loss function to **address class imbalance**  
-  - Extraction around **context windows**  
-  - **Early stopping** and detailed evaluation logging  
+### 2. Lexicon-based Snippet Selection
 
-- The model identifies AI-related narratives in WSJ articles.  
-- A subsequent **sentiment analysis** (with [ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert)) is conducted.  
-- The resulting sentiment outputs are **further processed** (normalization, aggregation, exponential smoothing) and condensed into a **daily AINI time series**.  
-
----
-
-### 2. Lexicon-Based Snippet Reduction
-
-- **Identification** of AI-related articles via **keyword lists**  
-- Application of **FinBERT** on extracted **text snippets** around various **context windows**  
-- Sentiment outputs are likewise **normalized, aggregated, and smoothed**, then transformed into **daily AINI time series**  
+- Pre-selection of AI-related paragraphs through a **rule-based keyword search**
+- Extraction of multiple **context windows** around flagged keywords
+- Application of FinBERT to these snippets, followed by **aggregation and smoothing** into daily scores
+- Construction of additional AINI variants for robustness analysis
 
 ---
 
 ## Statistical Inference
 
-To analyze the interactions between narratives and financial markets, **econometric methods** are applied.
+The interaction between narratives and financial variables is analyzed using **econometric methods**.
 
 ### Stationarity Tests
 - Augmented Dickey-Fuller (ADF)  
 - Phillips-Perron (PP)  
 - KPSS  
 
-All variables are tested for stationarity prior to modeling.  
+All time series were tested for stationarity and differenced when required.
 
-### Granger Causality (GC)
+### Granger Causality
 
-Granger causality between AINI and financial variables is tested using:
+To assess directional relationships between AINI and stock returns, Granger causality tests are employed.  
+The methodology includes:
 
-- **Wild Residual Bootstrap** (10,000 resamples, Rademacher weights) → robust empirical p-values  
-- **Benjamini–Hochberg correction** for controlling false discovery rate in multiple tests  
+- **Wild Residual Bootstrap** (10,000 resamples with Rademacher weights) → robust empirical p-values  
+- **Benjamini–Hochberg correction** to control the false discovery rate across multiple tests  
 
-Regression specification (with VIX growth rate as a control for market risk*):  
+Example regression specification:
 
-![GC Formula VIX](<GC VIX-1.png>)  
-![Legend](legende_klein-1.png)
+![Granger causality](gc_equ_c.png)
 
-*Additional control variables: number of daily articles, market index (S&P 500), and semiconductor index (SOX).  
+All models were also estimated in the **reverse direction** (log return → AINI) to assess potential feedback effects from market movements to narratives.
+
+*Control variables:* daily growth of article counts, S&P 500 index, SOX index.  
+*Lag lengths:* l = ρ ∈ {1, 2, 3}
 
 ---
 
-## Selected Results
+## Results (Selected)
 
-The first chart illustrates the AI Narrative Index (AINI) in different variants, where **prefixes indicate the size** of the applied **context window**.  
-**Variant C** is based on the **full article** (title + main text) and uses the maximum possible input of 512 tokens.  
-The displayed **series** represent the **mean of all variables** (see formula) within each context window.  
+### AI Narrative Index (AINI) – Variant Comparison
+
+The variants differ in the size of the applied context window:  
+**w₀** uses only the sentence containing an AI keyword (no context integration),  
+**w₁** extends the window bidirectionally by one sentence before and after the hit,  
+**w₂** covers two surrounding sentences,  
+and **custom** processes the entire article (headline + main text, up to 512 tokens).  
+Larger context windows capture **greater semantic depth** and **narrative coherence** across text segments.
 
 ![AINI](aini_means.png)
 
-The next chart shows the estimated regression coefficients of the different AINI variables for the respective stocks & ETFs.  
-Significance is independently confirmed by both methods — analytic tests as well as bootstrap inference with FDR correction.  
+### Significant Effects by Asset and Period
 
-![Scatter of coefficients](image.png)  
+The following figure shows significant Granger-causality results (AINI → returns):
 
-**Preliminary conclusions:**  
-- Context window size correlates with the negativity of the AINI.  
-- For w=0, 1 & 2, the indices peak at partly predictable points in time.  
-- For highly AI-exposed companies (e.g., NVIDIA, Broadcom), **robust relationships** AINI → returns can be observed.  
+![Significant results per asset](vix_aini_to_ret_sig_counts.png)
+
+### Distribution of Regression Coefficients
+
+The distribution of γ-coefficients illustrates the dispersion and direction of AINI effects:
+
+![Distribution of regressors](distribution_of_gammas.png)
+
+---
+
+## Key Findings
+
+**Model Behavior**
+- Larger context windows tend to produce more negative sentiment scores.
+- The fine-tuned FinBERT model achieved a weighted Macro-F1 score of **0.92** on the test set.
+- The lexicon-based variant performed comparably on the validated dataset.
+
+**Economic Results**
+- The AINI series (w₀–w₂) are non-stationary in 2025 → possible regime shift indicator.  
+- Consistent with the Efficient Market Hypothesis, most regressions are insignificant.  
+- For significant cases, AINI explains only a small share of overall variance but increases short-term return volatility by a factor of 5–35.  
+- In the reverse direction (returns → AINI), some assets exhibit strong narrative responses (up to 85% explained variation).
+
+**Limitations**
+- Based solely on WSJ articles (2023–2025)
+- Focused on high-growth assets (e.g., NVIDIA)
+- Short sample period
+- No modeling of non-linear effects
 
 ---
 
 ## Project Structure
 
-The implementation follows a **modular best-practice design**.  
-All components are clearly separated (data acquisition, preprocessing, annotation, modeling, visualization), ensuring the pipeline can be executed reproducibly.  
+The implementation follows a **modular, MLOps-inspired architecture**.  
+All components — from data collection to econometric analysis — are **separated, reproducible, and accessible via CLI scripts**.
 
 ```text
 AI_narrative_index/
@@ -116,6 +143,7 @@ AI_narrative_index/
 │   │   ├── corpus_cleaning.py                  # Remove UI/meta elements from text
 │   │   ├── reduce_db_for_sentiment.py          # Extract subset for sentiment analysis
 │   │   ├── combine_article_dbs.py              # Merge yearly DBs into one CSV
+│   │   ├── fix_article_ids.py                  # Ensure uniquenes of article IDs
 │   │   ├── section_filtering.py                # Remove irrelevant WSJ sections
 │   │   └── simple_ai_filter.py                 # Mark articles with AI keywords
 │   │
@@ -131,47 +159,62 @@ AI_narrative_index/
 │   │   ├── CustomFinBERT.py                    # Custom FinBERT with dropout & class weights
 │   │   ├── stationarity_testing.py             # Stationarity tests (ADF, PP)
 │   │   ├── estimate_granger_causality.py       # Granger causality with bootstrap
+│   │   ├── estimate_transfer_entropy.py        # infer KSG-based Entropy (legacy)
+│   │   ├── format_te_gc_inputs.py              # prepare data of KSG estimator (legacy)
 │   │   ├── predict_binary_AINI_FinBERT.py      # AI vs. Non-AI classification
 │   │   └── predict_AINI_FinBERT_window.py      # Context-based sentiment inference
 │   │
 │   ├── visualizations/
-│   │   ├── construct_latex_tables.py           # Automated LaTeX tables
-│   │   └── plot_granger_causality.py           # Visualize GC results
+│   │   ├── construct_tables.py                 # create reporting for Granger causality
+│   │   ├── plot_functions.py                   # plot various AINI series
+│   │   ├── plot_granger_causality.py           # plot regression results
+│   │   ├── prepare PPT.py                      # buils PowerPoint regression tables
+│   │   ├── read_articles.py                    # visualize article content
+│   │   └── stationarity_report.py              # create reporting for KPSS, ADF & PP
+│   │   
 │   │
 │   ├── databases/
-│   │   ├── fix_article_ids_in_db.py            # Ensure unique article_id
 │   │   └── create_database.py                  # Create SQL DB structure
 │   │
-│   ├── scripts/                                # CLI wrappers for reproducibility
-│   │   ├── run_create_database.py
-│   │   ├── run_wsj_scraper.py
-│   │   ├── run_clean_database.py
-│   │   ├── run_reduce_db_for_sentiment.py
-│   │   ├── run_predict_investor_sentiment.py
-│   │   ├── run_predict_binary_AINI_FinBERT.py
-│   │   ├── run_predict_AINI_FinBERT_window.py
-│   │   │── run_combine_article_dbs.py
-│   │   │── run_fix_article_ids.py
-│   │   │── run_estimate_granger_causality.py
-│   │   │── run_estimate_OLS.py
-│   │   │── run_naive_labeling.py
-│   │   └── run_construct_AINI_variables.py
 │
+├── scripts/                                    # CLI wrappers for reproducibility
+│   ├── __init__.py
+│   ├── estimate_collider_granger_causality.py
+│   ├── init_jvm.py
+│   ├── run_clean_database.py
+│   ├── run_combine_article_dbs.py
+│   ├── run_construct_AINI_variables.py
+│   ├── run_create_database.py
+│   ├── run_estimate_granger_causality.py
+│   ├── run_estimate_ols.py
+│   ├── run_fix_article_ids.py
+│   ├── run_load_financial_data.py
+│   ├── run_naive_labeling.py
+│   ├── run_predict_AINI_FinBERT_prelabeled_fin.py
+│   ├── run_predict_AINI_FinBERT_window.py
+│   ├── run_predict_binary_AINI_FinBERT.py
+│   ├── run_predict_investor_sentiment.py
+│   ├── run_reduce_db_for_sentiment.py
+│   ├── run_stationarity_testing.py
+│   ├── run_wsj_crawler.py
+│   └── run_wsj_scraper.py
+│ 
 ├── notebooks/
-│   ├── analyse_gc_results.ipynb
-│   ├── benchmark_windows.ipynb
-│   ├── compare_annotations.ipynb
-│   ├── compare_class_variants.ipynb
-│   ├── exploratory_analysis_aini.ipynb
-│   ├── exploratory_analysis_labels.ipynb
-│   ├── exploratory_analysis_raw_res.ipynb
-│   ├── exploratory_analysis_wsj.ipynb
-│   ├── label_manually.ipynb
-│   ├── sample_articles.ipynb
-│   ├── subset_for_latex.ipynb
-│   ├── subset_VIX.ipynb
-│   ├── train_FinBERT_annot.ipynb
-│   └── visualize_aini_variables.ipynb
+│   ├── analyse_gc_results.ipynb               # Analyse Granger causality results
+│   ├── benchmark_windows.ipynb                # Compare flagging models
+│   ├── calc_CAPM.ipynb                        # Run CAPM regressions
+│   ├── compare_annotations.ipynb              # Compare annotation windows
+│   ├── compare_class_variants.ipynb           # Investigate different classification setups
+│   ├── exploratory_analysis_aini.ipynb        # Analyse AINI time series 
+│   ├── exploratory_custom_fin.ipynb           # Analyse results of finetuned FinBERT 
+│   ├── exploratory_analysis_raw_res.ipynb     # Analyse FinBERT annotations
+│   ├── exploratory_analysis_wsj.ipynb         # Analyse WSJ-data
+│   ├── label_manually.ipynb                   # Annotate articles
+│   ├── sample_articles.ipynb                  # Sample articles for annotation
+│   ├── stationarity_evaluation.ipynb          # Investigate stationarity issues
+│   ├── subset_for_latex.ipynb                 # Prepare for LaTex reporting (legacy)
+│   ├── train_FinBERT_annot.ipynb              # Finetune custom FinBERT
+│   └── visualize_aini_variables.ipynb         # Inspect AINI (legacy)
 │
 ├── data/
 │   ├── raw/                                   # Raw data (articles, financials)
@@ -180,7 +223,7 @@ AI_narrative_index/
 │       ├── variables/                         # Final variables (AINI, GC, TE etc.)
 │       └── articles/                          # Cleaned article texts
 │
-└── models/                                    # Fine-tuned FinBERT & sentiment models
+└── models/                                    # Fine-tuned FinBERT
 
 
 

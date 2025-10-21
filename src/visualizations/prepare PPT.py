@@ -9,7 +9,7 @@ from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN
 
 
-# ========= 1) REJECTION RATE LOGIC =========
+# REJECTION RATE LOGIC
 
 def _to_bool_series(s: pd.Series) -> pd.Series:
     """Robustly coerce to boolean."""
@@ -61,9 +61,9 @@ def compute_rejection_rates_all(gc_all_results: pd.DataFrame, direction_substr="
     return {"by_year": by_year, "by_ticker": by_ticker, "a2r": a2r}
 
 
-# ========= 2) ADD “TRADING DAYS” COLUMN =========
+#  2) ADD “TRADING DAYS” COLUMN 
 
-# Your mapping (use underscores like in your Year labels)
+# mapping
 TRADING_DAYS_MAP = {
     "2024_25":      365,   # "2024-25"
     "2023_24_25":   553,   # "2023-2025"
@@ -108,7 +108,7 @@ def add_trading_days_columns(rates: dict) -> dict:
     return {"by_year": out_by_year, "by_ticker": out_by_ticker, "a2r": a2r}
 
 
-# ========= 3) POWERPOINT (TABLES ONLY, NO PLOTS) =========
+#  POWERPOINT 
 
 def _add_title(slide, text, fontsize=24):
     tx = slide.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
@@ -199,7 +199,7 @@ def export_rejection_rates_to_pptx_all_tables_only(
     return outpath.resolve()
 
 
-# ========= 4) USAGE =========
+# 4) USAGE
 # from this_module import compute_rejection_rates_all, add_trading_days_columns, export_rejection_rates_to_pptx_all_tables_only
 #
 # rates = compute_rejection_rates_all(gc_all_results, direction_substr="AINI_to_RET")
